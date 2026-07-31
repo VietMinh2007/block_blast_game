@@ -548,3 +548,22 @@ int main() {
         std::cerr << "Khong tim thay font assets/font.ttf\n";
         return 1;
     }
+    sf::String text;
+    sf::Color color;
+};
+using Paragraph = std::vector<ColoredWord>;
+
+static void appendWords(Paragraph& p, const std::string& utf8Text, sf::Color color) {
+    std::istringstream iss(utf8Text);
+    std::string token;
+    while (iss >> token) {
+        p.push_back({U8(token), color});
+    }
+}
+
+// Một từ đã được layout sẵn: nội dung + vị trí (x, y) tuyệt đối trên màn hình.
+struct LaidOutWord {
+    sf::String text;
+    sf::Color color;
+    float x, y;
+};
