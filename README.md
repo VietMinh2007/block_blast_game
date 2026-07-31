@@ -1,5 +1,6 @@
 # Block Blast game
 **Tên dự án:** Block Blast - UTC2 .
+
 **Mô tả:** Một trò chơi xếp khối (block puzzle) mang phong cách "hắc hóa" đầy tính thử thách, được xây dựng bằng C++ và thư viện đồ họa SFML 3.1.0. Đây không chỉ là một game xếp gạch thông thường mà còn là một bài toán tối ưu không gian lưu trữ thực tế. 
 
 **Mục tiêu:** Giúp người chơi rèn luyện tư duy logic, phản xạ nhanh nhạy, và... thử thách giới hạn chịu đựng của bản thân trước những lời "cà khịa" từ hệ thống AI của game.
