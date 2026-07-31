@@ -225,3 +225,75 @@ static UiStrings makeVietnameseStrings() {
         "- Game kết thúc khi không còn khối nào đặt vừa vào lưới.");
     s.howtoDifficultyTitle = U8("| ĐỘ KHÓ"); (Mức độ)" thay vì chỉ
     // mốc đầu/cuối mới có chú thích trong ngoặc như bản cũ, cho khoa học hơn.
+    s.howtoDifficultyIntro = U8("Độ khó tăng dần theo điểm số, màu nền cũng đổi theo từng mốc:");
+    s.howtoDifficultyRanges = {
+        U8("0 - 2.500"), U8("2.500 - 10.000"), U8("10.000 - 50.000"),
+        U8("50.000 - 250.000"), U8("250.000 - 1.000.000"),
+        U8("1.000.000 - 2.000.000"), U8("2.000.000+")
+    };
+    s.howtoDifficultyDescriptors = {
+        U8("(Rất dễ)"), U8("(Dễ)"), U8("(Trung bình)"),
+        U8("(Khó)"), U8("(Rất khó)"),
+        U8("(Siêu khó)"), U8("(Đỉnh cao)")
+    };
+    s.howtoTimeAttackTitle = U8("ĐẤU THỜI GIAN");
+    s.howtoTimeAttackBody = U8(
+        "Chạy đua với thời gian, đạt điểm cao nhất có thể!\n"
+        "- Bạn bắt đầu với 3 phút.\n"
+        "- Đặt khối để hoàn thành hàng/cột và ghi điểm.\n"
+        "- Mỗi lần xóa hàng/cột sẽ được cộng thêm thời gian.\n"
+        "- Xóa càng nhiều hàng/cột trong 1 lượt, thời gian\n"
+        "  thưởng càng nhiều.\n"
+        "- Kết thúc khi hết giờ hoặc không còn chỗ đặt khối.");
+    s.howtoSurvivalTitle = U8("SINH TỒN");
+    s.howtoSurvivalBody = U8(
+        "Kiểm soát bàn cờ và giữ Pressure an toàn để sinh tồn!\n"
+        "- Bắt đầu với 2 Rock Block trên bàn cờ.\n"
+        "- Sau mỗi 15 khối được đặt, thêm Rock Block xuất hiện.\n"
+        "- Rock Block chỉ mất khi hàng/cột chứa nó được hoàn\n"
+        "  thành - càng nhiều Rock Block tồn tại, Pressure càng\n"
+        "  tăng nhanh.\n"
+        "- Xóa hàng/cột và phá Rock Block để giảm Pressure.\n"
+        "  Pressure đạt 100 sẽ kết thúc trận ngay lập tức.\n"
+        "- Ngoài ra, kết thúc khi không còn chỗ đặt khối.\n"
+        "Mẹo: đừng chỉ chăm ghi điểm - hãy dọn Rock Block\n"
+        "thường xuyên và ăn nhiều hàng/cột cùng lúc để giữ\n"
+        "Pressure ở mức thấp.");
+    s.pressureLabel = U8("PRESSURE");
+    s.pressureWarnRising = U8("\u26A0 PRESSURE RISING");
+    s.pressureWarnHigh = U8("\u26A0 HIGH PRESSURE");
+    s.pressureWarnCritical = U8("\u2620 CRITICAL PRESSURE");
+    s.pressureOverloadLine1 = U8("PRESSURE OVERLOAD");
+    s.pressureOverloadLine2 = U8("You Couldn't Survive...");
+    s.howtoHint = U8("(Nhấn phím bất kỳ hoặc click để quay lại)");
+    s.hudPrefixScore = U8("Điểm: ");
+    s.hudPrefixHigh = U8("   Cao nhất: ");
+    s.hudPrefixCombo = U8("   Combo: ");
+    s.hudComboBlocksPrefix = U8("Cho phép lỡ: ");
+    s.hudComboBlocksSuffix = U8(" khối");
+    s.gameOverTitle = U8("GAME OVER");
+    s.finalScorePrefix = U8("Điểm cuối cùng: ");
+    s.finalScoreHighSuffixOpen = U8("   (Cao nhất: ");
+    s.retryHint = U8("Nhấn R để chơi lại   |   ESC để về Menu");
+    s.timeAttackLabel = U8("THỜI GIAN");
+    s.classicPlayTimeLabel = U8("ĐÃ CHƠI");
+    s.survivalObstacleLabel = U8("ĐÁ");
+
+    s.panelScoreLabel = U8("ĐIỂM");
+    s.panelDifficultyLabel = U8("ĐỘ KHÓ");
+    s.panelHighScoreLabel = U8("ĐIỂM CAO NHẤT");
+    s.panelComboLabel = U8("COMBO");
+    s.difficultyTierNames = {
+        U8("Yên bình"), U8("Dễ"), U8("Bình thường"),
+        U8("Khó"), U8("Cực đoan"), U8("Điên rồ"), U8("Bậc thầy")
+    };
+
+    s.settingsTitle = U8("Cài đặt");
+    s.labelSound = U8("Âm thanh");
+    s.labelMusic = U8("Nhạc nền");
+    s.stateOn = U8("BẬT");
+    s.stateOff = U8("TẮT");
+    s.btnHome = U8("Trang chủ");
+    s.btnReplay = U8("Chơi lại");
+    return s;
+}
