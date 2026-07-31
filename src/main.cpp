@@ -48,3 +48,180 @@ enum class GameMode { CLASSIC, TIME_ATTACK, SURVIVAL };
 static sf::String U8(const std::string& utf8) {
     return sf::String::fromUtf8(utf8.begin(), utf8.end());
 }
+
+    // Mở rộng: căn đều cả 5 mốc theo cùng khuôn "Tên
+// ===================== NGÔN NGỮ (Choose A Language) =====================
+enum class Language { ENGLISH, VIETNAMESE };
+
+struct UiStrings {
+    sf::String menuTitle;
+    sf::String btnClassic, btnTimeAttack, btnSurvival; // 3 nút chế độ chơi mới
+    sf::String btnHowTo, btnQuit;
+    sf::String highScoreLabel;
+    sf::String howtoTitle;
+    // Mở rộng: tách màn hình Hướng dẫn thành các khối riêng (Cơ bản / Độ khó /
+    // Đấu thời gian / Sinh tồn) để vẽ dạng 2 cột có khung màu, thay cho 1 khối
+    // văn bản dài như trước.
+    sf::String howtoBasicTitle, howtoBasicBody;
+    sf::String howtoDifficultyTitle;
+    // Mở rộng: tách bảng độ khó thành từng cột riêng (khoảng điểm / tên mức /
+    // mô tả) để vẽ dạng bảng canh cột thật bằng tọa độ x cố định - dùng dấu
+    // cách để canh trong 1 chuỗi văn bản KHÔNG đều nhau vì font không phải
+    // monospace, nên phải tách cột như vậy mới thẳng hàng chính xác.
+    sf::String howtoDifficultyIntro;
+    std::array<sf::String, 7> howtoDifficultyRanges;
+    std::array<sf::String, 7> howtoDifficultyDescriptors;
+    sf::String howtoTimeAttackTitle, howtoTimeAttackBody;
+    sf::String howtoSurvivalTitle, howtoSurvivalBody;
+    sf::String howtoHint;
+    sf::String hudPrefixScore, hudPrefixHigh, hudPrefixCombo;
+    sf::String hudComboBlocksPrefix, hudComboBlocksSuffix; // "còn bao nhiêu khối trước khi mất combo"
+    sf::String gameOverTitle;
+    sf::String finalScorePrefix, finalScoreHighSuffixOpen; // "Score: X   (High: Y)"
+    sf::String retryHint;
+    // Time Attack
+    sf::String timeAttackLabel; // nhãn đồng hồ đếm ngược
+    sf::String survivalObstacleLabel; // nhãn ô chướng ngại
+    // Mở rộng: nhãn thanh thời gian đã chơi, chỉ hiện ở chế độ Classic - đếm LÊN
+    // (khác với đồng hồ đếm NGƯỢC của Time Attack) để người chơi biết mình đã
+    // chơi ván Classic hiện tại bao lâu.
+    sf::String classicPlayTimeLabel;
+
+    // Survival - Pressure System
+    sf::String pressureLabel; // nhãn mặc định (Level 1 - SAFE)
+    sf::String pressureWarnRising;   // Level 2 (26-50) WARNING
+    sf::String pressureWarnHigh;     // Level 3 (51-75) DANGER
+    sf::String pressureWarnCritical; // Level 4 (76-99) CRITICAL
+    sf::String pressureOverloadLine1, pressureOverloadLine2; // Pressure = 100
+
+    // Mở rộng: nhãn cho panel bên trái (Điểm/Độ khó) và bên phải (Cao nhất/Combo).
+    sf::String panelScoreLabel, panelDifficultyLabel;
+    sf::String panelHighScoreLabel, panelComboLabel;
+    std::array<sf::String, 7> difficultyTierNames; // 0=Yên bình .. 4=Cực đoan .. 6=Bậc thầy
+
+    // Mở rộng: bảng Settings (bật/tắt âm thanh đặt khối, bật/tắt nhạc nền) và
+    // 2 nút bấm "Trang chủ" / "Chơi lại" trên màn hình Game Over.
+    sf::String settingsTitle;
+    sf::String labelSound, labelMusic;
+    sf::String stateOn, stateOff;
+    sf::String btnHome, btnReplay;
+};
+
+static UiStrings makeEnglishStrings() {
+    UiStrings s;
+    s.menuTitle = "BLOCK BLAST";
+    s.btnClassic    = sf::String("Classic");
+    s.btnTimeAttack = sf::String("Time Attack");
+    s.btnSurvival   = sf::String("Survival");
+    s.btnHowTo = sf::String("How To Play");
+    s.btnQuit = "Quit";
+    s.highScoreLabel = "High score: ";
+    s.howtoTitle = "HOW TO PLAY";
+    s.howtoBasicTitle = "| BASICS";
+    s.howtoBasicBody =
+        "- Drag a block from the tray below onto the 8x8 grid.\n"
+        "- Fill a full row or column to clear it and score points.\n"
+        "- Clearing several rows/columns at once gives a combo bonus.\n"
+        "- Dark block (red outline) = BOMB block: blasts a 3x3 area.\n"
+        "- White block (purple outline) = WILDCARD block: can be placed\n"
+        "  on any cell, even one already occupied.\n"
+        "- Press H to print a placement hint to the console.\n"
+        "- Press M anytime to mute/unmute the background music.\n"
+        "- The game ends when no block in the tray fits on the grid.";
+    s.howtoDifficultyTitle = "| DIFFICULTY";
+    // Mở rộng: căn đều 5 mốc độ khó theo cùng 1 khuôn "Tên (Mức)" để nhìn
+    // khoa học, thay vì chỉ có mốc đầu/cuối mới có phần mô tả trong ngoặc.
+    s.howtoDifficultyIntro = "Difficulty rises with your score; background color shifts too:";
+    s.howtoDifficultyRanges = {
+        sf::String("0 - 2,500"), sf::String("2,500 - 10,000"), sf::String("10,000 - 50,000"),
+        sf::String("50,000 - 250,000"), sf::String("250,000 - 1,000,000"),
+        sf::String("1,000,000 - 2,000,000"), sf::String("2,000,000+")
+    };
+    s.howtoDifficultyDescriptors = {
+        sf::String("(Very easy)"), sf::String("(Easy)"), sf::String("(Medium)"),
+        sf::String("(Hard)"), sf::String("(Very hard)"),
+        sf::String("(Insane)"), sf::String("(Master)")
+    };
+    s.howtoTimeAttackTitle = "TIME ATTACK";
+    s.howtoTimeAttackBody =
+        "Race the clock and score as high as you can!\n"
+        "- You start with 3 minutes.\n"
+        "- Place blocks to complete rows/columns and score.\n"
+        "- Each row/column cleared adds bonus time.\n"
+        "- Clearing more lines at once grants more bonus time.\n"
+        "- Ends when time runs out or no block fits anymore.";
+    s.howtoSurvivalTitle = "SURVIVAL";
+    s.howtoSurvivalBody =
+        "Control the board and keep Pressure safe to survive!\n"
+        "- You start with 2 Rock Blocks on the board.\n"
+        "- Every 15 blocks placed, more Rock Blocks appear.\n"
+        "- A Rock Block clears only when its row/column is\n"
+        "  completed - the more Rocks left standing, the\n"
+        "  faster Pressure rises.\n"
+        "- Clear rows/columns and destroy Rocks to lower\n"
+        "  Pressure. If Pressure hits 100, it's game over.\n"
+        "- Also ends when there's no space left for a block.\n"
+        "Tip: don't just chase points - clear Rocks often and\n"
+        "go for multi-line clears to keep Pressure low.";
+    s.pressureLabel = "PRESSURE";
+    s.pressureWarnRising = U8("\u26A0 PRESSURE RISING");
+    s.pressureWarnHigh = U8("\u26A0 HIGH PRESSURE");
+    s.pressureWarnCritical = U8("\u2620 CRITICAL PRESSURE");
+    s.pressureOverloadLine1 = "PRESSURE OVERLOAD";
+    s.pressureOverloadLine2 = "You Couldn't Survive...";
+    s.howtoHint = "(Press any key or click to go back)";
+    s.hudPrefixScore = "Score: ";
+    s.hudPrefixHigh = "   High: ";
+    s.hudPrefixCombo = "   Combo: ";
+    s.hudComboBlocksPrefix = "Combo grace: ";
+    s.hudComboBlocksSuffix = " blocks";
+    s.gameOverTitle = "GAME OVER";
+    s.finalScorePrefix = "Final score: ";
+    s.finalScoreHighSuffixOpen = "   (High: ";
+    s.retryHint = "Press R to play again   |   ESC for Menu";
+    s.timeAttackLabel = "TIME";
+    s.classicPlayTimeLabel = "PLAYED";
+    s.survivalObstacleLabel = "ROCKS";
+
+    s.panelScoreLabel = "SCORE";
+    s.panelDifficultyLabel = "DIFFICULTY";
+    s.panelHighScoreLabel = "HIGH SCORE";
+    s.panelComboLabel = "COMBO";
+    s.difficultyTierNames = {
+        sf::String("Calm"), sf::String("Easy"), sf::String("Normal"),
+        sf::String("Hard"), sf::String("Extreme"), sf::String("Insane"), sf::String("Master")
+    };
+
+    s.settingsTitle = "Settings";
+    s.labelSound = "Sound";
+    s.labelMusic = "BGM";
+    s.stateOn = "ON";
+    s.stateOff = "OFF";
+    s.btnHome = "Home";
+    s.btnReplay = "Replay";
+    return s;
+}
+
+static UiStrings makeVietnameseStrings() {
+    UiStrings s;
+    s.menuTitle = "BLOCK BLAST";
+    s.btnClassic    = U8("Classic");
+    s.btnTimeAttack = U8("Time Attack");
+    s.btnSurvival   = U8("Survival");
+    s.btnHowTo = U8("Hướng dẫn");
+    s.btnQuit = U8("Tho\u00e1t");
+    s.highScoreLabel = U8("\u0110i\u1ec3m cao nh\u1ea5t: ");
+    s.howtoTitle = U8("HƯỚNG DẪN CHƠI");
+    s.howtoBasicTitle = U8("| CƠ BẢN");
+    s.howtoBasicBody = U8(
+        "- Kéo một khối từ khay ở dưới lên lưới 8x8.\n"
+        "- Lấp đầy 1 hàng hoặc 1 cột để được xóa và cộng điểm.\n"
+        "- Xóa nhiều hàng/cột cùng lúc sẽ được nhận combo.\n"
+        "- Khối màu tối (viền đỏ) = khối BOM: phá nổ vùng 3x3.\n"
+        "- Khối trắng (viền tím) = khối WILDCARD: đặt được vào\n"
+        "  bất kỳ ô nào, kể cả ô đã có khối khác.\n"
+        "- Nhấn H để xem gợi ý vị trí đặt (in ra console).\n"
+        "- Nhấn M bất cứ lúc nào để tắt/bật nhạc nền.\n"
+        "- Game kết thúc khi không còn khối nào đặt vừa vào lưới.");
+    s.howtoDifficultyTitle = U8("| ĐỘ KHÓ"); (Mức độ)" thay vì chỉ
+    // mốc đầu/cuối mới có chú thích trong ngoặc như bản cũ, cho khoa học hơn.
