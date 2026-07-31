@@ -476,7 +476,7 @@ static void drawHeart(sf::RenderWindow& window, float centerX, float centerY, fl
 
 // ===================== MỞ RỘNG: PHÂN TÍCH LƯỚI CHO "ROBOT MỎ HỖN" =====================
 // Các hàm dưới đây không thuộc Module 1-4 gốc, chỉ phục vụ riêng việc phát hiện
+
 // "nước đi tệ" để nuôi RoastManager (xem Roast.h/.cpp) - tách riêng để không
 // đụng vào code gốc của 4 thành viên.
-
 // Đếm số vùng trống liên thông (4 hướng) trên lưới + kích thước vùng trống lớn nhất.
