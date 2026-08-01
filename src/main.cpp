@@ -563,3 +563,122 @@ if (appIcon.loadFromFile("assets/icon.png")) {
     // Mở rộng: bảng Settings (biểu tượng bánh răng) - bật/tắt Sound & BGM bất cứ lúc nào
     // ở màn hình Menu hoặc Play, hoạt động như 1 overlay đè lên trên màn hình hiện tại.
     bool settingsOpen = false;
+
+   // ---------- Trạng thái game ----------
+    int grid[GRID_SIZE][GRID_SIZE];
+    resetGrid(grid); // Việc 4 - Module 1
+
+    int score = 0;
+    int streak = 0;
+    int missStreak = 0; // số khối liên tiếp không ăn dòng nào kể từ lần ăn combo gần nhất
+    int totalLinesCleared = 0;
+    int maxCombo = 0;
+    bool gameOver = false;
+
+    // ----- Game Mode và High Score riêng biệt -----
+    GameMode currentMode = GameMode::CLASSIC;
+    int highScoreClassic   = loadHighScore(HIGHSCORE_CLASSIC_FILE);
+    int highScoreTimeAttack= loadHighScore(HIGHSCORE_TIMEATTACK_FILE);
+    int highScoreSurvival  = loadHighScore(HIGHSCORE_SURVIVAL_FILE);
+    // Tham chiếu thuận tiện vào high score của mode hiện tại
+    auto getHighScore = [&]() -> int& {
+        if (currentMode == GameMode::TIME_ATTACK) return highScoreTimeAttack;
+        if (currentMode == GameMode::SURVIVAL)    return highScoreSurvival;
+        return highScoreClassic;
+    };
+    auto getHighScoreFile = [&]() -> const std::string& {
+        if (currentMode == GameMode::TIME_ATTACK) return HIGHSCORE_TIMEATTACK_FILE;
+        if (currentMode == GameMode::SURVIVAL)    return HIGHSCORE_SURVIVAL_FILE;
+        return HIGHSCORE_CLASSIC_FILE;
+    };
+    int highScore = highScoreClassic; // giữ tương thích với code cũ
+
+    // ----- Time Attack -----
+    float timeAttackRemaining = 180.f; // giây
+    const float TIME_ATTACK_INITIAL = 180.f;
+
+    // ----- Classic: đồng hồ đếm thời gian đã chơi (đếm LÊN từ 0, không giới hạn) -----
+    // Reset về 0 mỗi khi bắt đầu ván Classic mới (chọn Classic ở Menu, bấm R, hoặc bấm
+    // nút "Chơi lại" sau Game Over) - xem các nơi restart bên dưới.
+    sf::Clock classicPlayClock;
+
+    // ----- Survival: ô chướng ngại (mã màu -2 trên lưới) -----
+    const int OBSTACLE_COLOR = -2; // giá trị ô chướng ngại trên lưới
+    int totalBlocksPlaced = 0;    // tổng số khối đã đặt (dùng để trigger sinh ô mới mỗi 15 khối)
+    int lastObstacleAt = 0;       // giá trị totalBlocksPlaced khi lần cuối sinh ô chướng ngại
+
+    // Sinh ngẫu nhiên count ô chướng ngại vào các ô trống của lưới
+    auto spawnObstacles = [&](int count) {
+        std::vector<std::pair<int,int>> empty;
+        for (int r = 0; r < GRID_SIZE; r++)
+            for (int c = 0; c < GRID_SIZE; c++)
+                if (grid[r][c] == 0) empty.push_back({r, c});
+        // trộn ngẫu nhiên danh sách ô trống
+        for (int i = (int)empty.size()-1; i > 0; i--) {
+            int j = rand() % (i + 1);
+            std::swap(empty[i], empty[j]);
+        }
+        int toPlace = std::min(count, (int)empty.size());
+        for (int k = 0; k < toPlace; k++)
+            grid[empty[k].first][empty[k].second] = OBSTACLE_COLOR;
+    };
+
+    // ----- Survival: Pressure System -----
+    // Pressure đại diện cho mức độ nguy hiểm (0-100). Đạt 100 -> Game Over ngay lập tức.
+    int pressure = 0;                 // giá trị Pressure thực (số nguyên, kẹp [0,100])
+    float pressureDisplay = 0.f;      // giá trị hiển thị, nội suy mượt về "pressure" mỗi khung hình
+    float pressureShakeTimer = 0.f;   // đếm ngược hiệu ứng rung màn hình / phủ đỏ khi Overload
+    bool pressureGameOver = false;    // true nếu Game Over là do Pressure đạt 100 (không phải hết chỗ đặt)
+
+    // Cấp độ Pressure: 1 (0-25) SAFE, 2 (26-50) WARNING, 3 (51-75) DANGER, 4 (76-99) CRITICAL
+    auto pressureLevel = [](int p) -> int {
+        if (p <= 25) return 1;
+        if (p <= 50) return 2;
+        if (p <= 75) return 3;
+        return 4;
+    };
+
+    // Đếm số Rock Block đang tồn tại trên bàn cờ
+    auto countRocks = [&]() -> int {
+        int n = 0;
+        for (int r = 0; r < GRID_SIZE; r++)
+            for (int c = 0; c < GRID_SIZE; c++)
+                if (grid[r][c] == OBSTACLE_COLOR) n++;
+        return n;
+    };
+
+    // Số Rock Block cần sinh trong 1 đợt Spawn = spawn cơ bản theo Pressure Level
+    // hiện tại + đá cộng thêm theo số Rock Block đang tồn tại (trước khi sinh đợt này).
+    auto computeRockSpawnCount = [&](int existingRocks) -> int {
+        int lvl = pressureLevel(pressure);
+        int base = (lvl == 1) ? 2 : (lvl == 2) ? 3 : (lvl == 3) ? 4 : 5;
+        int extra = (existingRocks <= 4) ? 1 : (existingRocks <= 9) ? 2 : (existingRocks <= 14) ? 3 : 4;
+        return base + extra;
+    };
+
+    // Cộng/trừ Pressure, luôn kẹp trong [0,100]. Trả về true nếu Pressure VỪA đạt 100
+    // ở lần gọi này (dùng để kích hoạt Game Over "PRESSURE OVERLOAD").
+    auto addPressure = [&](int delta) -> bool {
+        bool wasMax = (pressure >= 100);
+        pressure += delta;
+        if (pressure < 0) pressure = 0;
+        if (pressure >= 100) { pressure = 100; return !wasMax; }
+        return false;
+    };
+
+    // Mở rộng: mốc độ khó (10k, 20k, 30k, ... điểm) đã đạt được gần nhất, để phát
+    // hiện đúng thời điểm "lên cấp" và thông báo cho người chơi (xem difficultyLevel trong Score.h).
+    int lastDifficultyLevel = difficultyLevel(score);
+
+    std::array<TraySlot, 3> tray;
+    auto refillTray = [&]() {
+        // Module 4 - thuật toán mới xét đến trạng thái lưới VÀ điểm số hiện tại (độ khó).
+        // classicHardMode chỉ = true khi đang chơi Classic, để KHÔNG ảnh hưởng Time
+        // Attack/Survival (yêu cầu: chỉ tăng độ khó cho chế độ Classic).
+        auto blocks = spawnNewBlocks(grid, score, currentMode == GameMode::CLASSIC);
+        for (int i = 0; i < 3; i++) {
+            tray[i].block = blocks[i];
+            tray[i].used = false;
+        }
+    };
+    refillTray();
