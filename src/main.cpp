@@ -1677,3 +1677,235 @@ if (!gameOver && isGameOver(grid, curBlocks, curUsed)) {
                 }
             }
 }
+
+        // ===================== VẼ (RENDER) =====================
+        // Mở rộng: vẽ biểu tượng bánh răng (Settings) dưới dạng 1 NÚT TRÒN có nền đặc màu
+        // (giống nút icon thông thường), để luôn thấy rõ dù nền phía sau là màu gì - trước
+        // đây vẽ icon không có nền nên bị chìm/mất hút trên nền sáng.
+        auto drawGearIcon = [&]() {
+            sf::Vector2f center(gearBtn.position.x + gearBtn.size.x / 2.f, gearBtn.position.y + gearBtn.size.y / 2.f);
+
+            // Nền nút tròn đặc màu + viền sáng, luôn nổi bật bất kể nền đằng sau
+            sf::CircleShape backing(22.f);
+            backing.setOrigin(sf::Vector2f(22.f, 22.f));
+            backing.setPosition(center);
+            backing.setFillColor(sf::Color(58, 68, 145));
+            backing.setOutlineColor(sf::Color(150, 170, 235));
+            backing.setOutlineThickness(2.5f);
+            window.draw(backing);
+
+            sf::CircleShape ring(11.f);
+            ring.setOrigin(sf::Vector2f(11.f, 11.f));
+            ring.setPosition(center);
+            ring.setFillColor(sf::Color::Transparent);
+            ring.setOutlineColor(sf::Color::White);
+            ring.setOutlineThickness(3.5f);
+            for (int i = 0; i < 8; i++) {
+                float ang = i * 45.f * 3.14159265f / 180.f;
+                sf::RectangleShape tooth(sf::Vector2f(8.f, 5.5f));
+                tooth.setOrigin(sf::Vector2f(4.f, 2.75f));
+                tooth.setPosition(sf::Vector2f(center.x + std::cos(ang) * 15.f, center.y + std::sin(ang) * 15.f));
+                tooth.setRotation(sf::radians(ang));
+                tooth.setFillColor(sf::Color::White);
+                window.draw(tooth);
+            }
+            window.draw(ring);
+            sf::CircleShape hub(4.f);
+            hub.setOrigin(sf::Vector2f(4.f, 4.f));
+            hub.setPosition(center);
+            hub.setFillColor(sf::Color::White);
+            window.draw(hub);
+        };
+
+        // Mở rộng: đổi nền phẳng cũ sang gradient tím-xanh đậm hơn, đỡ chói hơn khi
+        // chơi lâu và làm nổi bật khối màu tươi cùng các popup điểm/combo hơn.
+        window.clear(sf::Color::Black);
+
+        // Survival: hiệu ứng rung màn hình ngắn (~0.5s) khi Pressure đạt 100 (Overload).
+        {
+            sf::View shakeView = gameView;
+            if (currentMode == GameMode::SURVIVAL && pressureShakeTimer > 0.f) {
+                float shakeMag = 10.f * (pressureShakeTimer / 0.5f);
+                float ox = (static_cast<float>(rand() % 200) / 100.f - 1.f) * shakeMag;
+                float oy = (static_cast<float>(rand() % 200) / 100.f - 1.f) * shakeMag;
+                shakeView.setCenter(shakeView.getCenter() + sf::Vector2f(ox, oy));
+            }
+            window.setView(shakeView);
+        }
+        {
+            // Mở rộng: nền đổi màu theo mốc độ khó (nhạt = dễ -> đậm = khó), chỉ áp dụng
+            // khi đang chơi (screen PLAY); các màn hình khác vẫn giữ tông nền mặc định.
+            BgGradient targetBg = (screen == Screen::PLAY)
+                ? backgroundForTier(difficultyTier(score))
+                : (screen == Screen::MENU)
+                    ? BgGradient{ sf::Color(94, 176, 240), sf::Color(30, 110, 210) } // xanh dương tươi kiểu "arcade"
+                    : BgGradient{ sf::Color(20, 22, 46), sf::Color(46, 36, 92) };
+            auto lerpColor = [](sf::Color a, sf::Color b, float t) {
+                auto L = [&](std::uint8_t x, std::uint8_t y) {
+                    return static_cast<std::uint8_t>(x + (static_cast<float>(y) - x) * t);
+                };
+                return sf::Color(L(a.r, b.r), L(a.g, b.g), L(a.b, b.b));
+            };
+            currentBg.top = lerpColor(currentBg.top, targetBg.top, 0.04f);
+            currentBg.bottom = lerpColor(currentBg.bottom, targetBg.bottom, 0.04f);
+        }
+        drawBackgroundGradient(window, currentBg.top, currentBg.bottom, WINDOW_W, WINDOW_H);
+
+        if (screen == Screen::SPLASH) {
+            float t = splashClock.getElapsedTime().asSeconds();
+            float logoCenterY = WINDOW_H / 2.f - 40.f;
+
+            // Giai đoạn phóng to bung ra (0 - 0.5s, ease-out kèm "overshoot" nhẹ),
+            // ổn định lại (0.5 - 0.7s), rồi mờ dần ở 0.5s cuối trước khi chuyển màn.
+            float scaleMul = 1.f;
+            float alpha = 255.f;
+            if (t < 0.5f) {
+                float p = t / 0.5f;
+                float eased = 1.f - std::pow(1.f - p, 3.f);
+                scaleMul = 0.35f + eased * 0.95f; // 0.35 -> 1.30
+                alpha = 255.f * eased;
+            } else if (t < 0.7f) {
+                float p = (t - 0.5f) / 0.2f;
+                scaleMul = 1.30f - p * 0.30f; // 1.30 -> 1.00
+            }
+            if (t > SPLASH_TOTAL_DURATION - 0.5f) {
+                float p = (t - (SPLASH_TOTAL_DURATION - 0.5f)) / 0.5f;
+                alpha = 255.f * (1.f - std::min(1.f, p));
+            }
+
+            // Chớp sáng "nổ" ở tâm logo ngay lúc bắt đầu (0 - 0.35s), giống tia sáng
+            // bùng lên giữa cụm khối trong ảnh mẫu, rồi tắt nhanh trước khi logo ổn định.
+            const float flashLife = 0.35f;
+            if (t < flashLife) {
+                float fp = t / flashLife;
+                float fade = 1.f - fp;
+                std::uint8_t fa = static_cast<std::uint8_t>(220.f * fade * fade);
+                float radius = 30.f + fp * 150.f;
+                sf::CircleShape flash(radius);
+                flash.setOrigin(sf::Vector2f(radius, radius));
+                flash.setPosition(sf::Vector2f(WINDOW_W / 2.f, logoCenterY));
+                flash.setFillColor(sf::Color(255, 235, 180, fa));
+                window.draw(flash);
+                sf::CircleShape flashCore(radius * 0.4f);
+                flashCore.setOrigin(sf::Vector2f(radius * 0.4f, radius * 0.4f));
+                flashCore.setPosition(sf::Vector2f(WINDOW_W / 2.f, logoCenterY));
+                flashCore.setFillColor(sf::Color(255, 255, 255, fa));
+                window.draw(flashCore);
+            }
+
+            // Hiệu ứng các khối màu "văng ra" từ tâm logo trong ~1.2s đầu, giống ảnh
+            // "Mẫu 1 - Bùng nổ", rồi mờ dần và biến mất.
+            const float particleLife = 1.2f;
+            if (t < particleLife) {
+                float pp = t / particleLife;
+                std::uint8_t pa = static_cast<std::uint8_t>(255.f * (1.f - pp));
+                for (auto& pt : splashParticles) {
+                    float dx = std::cos(pt.angle) * pt.speed * pp * 2.4f;
+                    float dy = std::sin(pt.angle) * pt.speed * pp * 2.4f;
+                    sf::RectangleShape sq(sf::Vector2f(pt.size, pt.size));
+                    sq.setOrigin(sf::Vector2f(pt.size / 2.f, pt.size / 2.f));
+                    sq.setPosition(sf::Vector2f(WINDOW_W / 2.f + dx, logoCenterY + dy));
+                    sq.setRotation(sf::radians(pt.angle));
+                    sf::Color c = pt.color; c.a = pa;
+                    sq.setFillColor(c);
+                    window.draw(sq);
+                }
+            }
+
+            if (splashLogoLoaded) {
+                splashLogoSprite.setPosition(sf::Vector2f(WINDOW_W / 2.f, logoCenterY));
+                float s = SPLASH_LOGO_BASE_SCALE * scaleMul;
+                splashLogoSprite.setScale(sf::Vector2f(s, s));
+                std::uint8_t a8 = static_cast<std::uint8_t>(std::max(0.f, std::min(255.f, alpha)));
+                splashLogoSprite.setColor(sf::Color(255, 255, 255, a8));
+                window.draw(splashLogoSprite);
+            }
+
+            // Chữ "BLOCK BLAST" đã được vẽ sẵn trong artwork splash_logo.png nên không
+            // cần vẽ thêm text riêng nữa - chỉ giữ lại độ mờ/hiện dùng cho gợi ý bên dưới.
+            std::uint8_t titleAlpha = static_cast<std::uint8_t>(std::max(0.f, std::min(255.f, alpha)));
+
+            // Gợi ý bấm để bỏ qua, chỉ hiện sau khi logo đã ổn định, mờ dần lúc sắp chuyển màn
+            if (t > 1.0f) {
+                sf::Text skipHint(font, U8("Click / Nhan phim bat ky de tiep tuc"), 16);
+                sf::FloatRect shb = skipHint.getLocalBounds();
+                skipHint.setOrigin(sf::Vector2f(shb.position.x + shb.size.x / 2.f, shb.position.y + shb.size.y / 2.f));
+                skipHint.setPosition(sf::Vector2f(WINDOW_W / 2.f, WINDOW_H - 60.f));
+                skipHint.setFillColor(sf::Color(255, 255, 255, titleAlpha > 150 ? 150 : titleAlpha));
+                window.draw(skipHint);
+            }
+        }
+        else if (screen == Screen::DISCLAIMER) {
+            window.draw(disclaimerTitle);
+
+            for (const auto& w : disclaimerLayout) {
+                sf::Text t(font, w.text, dcCharSize);
+                t.setFillColor(w.color);
+                t.setPosition(sf::Vector2f(w.x, w.y));
+                window.draw(t);
+            }
+
+            window.draw(agreeBtn);
+            window.draw(disagreeBtn);
+        }
+        else if (screen == Screen::LANGUAGE) {
+            window.draw(langTitle);
+            window.draw(langSubtitle);
+
+            // ô hiển thị lựa chọn hiện tại
+            sf::RectangleShape selectBox(selectBoxSize);
+            selectBox.setPosition(selectBoxPos);
+            selectBox.setFillColor(sf::Color(45, 45, 60));
+            selectBox.setOutlineColor(sf::Color(90, 90, 110));
+            selectBox.setOutlineThickness(1.f);
+            window.draw(selectBox);
+
+            sf::Text currentLangText(font, selectedLanguage == Language::ENGLISH ? "English" : U8("Tiếng Việt"), 22);
+            currentLangText.setFillColor(sf::Color::White);
+            currentLangText.setPosition(sf::Vector2f(selectBoxPos.x + 20.f, selectBoxPos.y + 10.f));
+            window.draw(currentLangText);
+
+            sf::Text chevron(font, "v", 20);
+            chevron.setFillColor(sf::Color(180, 180, 180));
+            chevron.setPosition(sf::Vector2f(selectBoxPos.x + selectBoxSize.x - 30.f, selectBoxPos.y + 12.f));
+            window.draw(chevron);
+
+            auto drawOption = [&](const sf::FloatRect& row, const sf::String& label, bool selected) {
+                sf::RectangleShape rowBg(row.size);
+                rowBg.setPosition(row.position);
+                rowBg.setFillColor(selected ? sf::Color(70, 70, 90) : sf::Color(38, 38, 50));
+                window.draw(rowBg);
+
+                sf::CircleShape radioOuter(8.f);
+                radioOuter.setPosition(sf::Vector2f(row.position.x + 15.f, row.position.y + row.size.y/2.f - 8.f));
+                radioOuter.setFillColor(sf::Color::Transparent);
+                radioOuter.setOutlineColor(sf::Color::White);
+                radioOuter.setOutlineThickness(2.f);
+                window.draw(radioOuter);
+
+                if (selected) {
+                    sf::CircleShape radioInner(4.f);
+                    radioInner.setPosition(sf::Vector2f(row.position.x + 19.f, row.position.y + row.size.y/2.f - 4.f));
+                    radioInner.setFillColor(sf::Color::White);
+                    window.draw(radioInner);
+                }
+
+                sf::Text lbl(font, label, 20);
+                lbl.setFillColor(sf::Color::White);
+                lbl.setPosition(sf::Vector2f(row.position.x + 40.f, row.position.y + row.size.y/2.f - 12.f));
+                window.draw(lbl);
+            };
+
+            drawOption(englishRow, "English", selectedLanguage == Language::ENGLISH);
+            drawOption(vietnameseRow, U8("Tiếng Việt"), selectedLanguage == Language::VIETNAMESE);
+
+            sf::RectangleShape okBtn(langOkBtn.size);
+            okBtn.setPosition(langOkBtn.position);
+            okBtn.setFillColor(sf::Color(52, 152, 219));
+            window.draw(okBtn);
+            sf::Text okText(font, "OK", 22);
+            okText.setFillColor(sf::Color::White);
+            okText.setPosition(sf::Vector2f(langOkBtn.position.x + langOkBtn.size.x/2.f - okText.getGlobalBounds().size.x/2.f,
+                                             langOkBtn.position.y + 12.f));
+            window.draw(okText);
+        }
