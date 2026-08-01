@@ -1590,3 +1590,90 @@ if (appIcon.loadFromFile("assets/icon.png")) {
                                     : sf::String("Difficulty up! Lv ") + sf::String(std::to_string(newDifficultyLevel));
                                 spawnBonusPopup(0, lvlLabel, false);
                             }
+
+// ---------- Mở rộng: "Robot mỏ hỗn" - phát hiện nước đi tệ ----------
+                            // 1) Đặt khối làm vỡ vụn / bóp nghẹt không gian trống đang có, mà
+                            //    không ăn được hàng/cột nào để bù lại - "đi vào lòng đất".
+                            if (!placedSpecialBlock && linesCleared == 0 && cellsPlaced >= 4) {
+                                int regionsAfterMove, largestAfterMove;
+                                analyzeEmptyRegions(grid, regionsAfterMove, largestAfterMove);
+                                bool fragmentedBadly =
+                                    (regionsAfterMove > regionsBeforeMove) ||
+                                    (largestBeforeMove > 0 && largestAfterMove < largestBeforeMove * 0.6);
+                                if (fragmentedBadly) {
+                                    bool wasLongThink = pendingThinkTime > 10.f;
+                                    roastManager.tryTrigger(wasLongThink ? RoastTrigger::AfkBadMove
+                                                                          : RoastTrigger::BadPlacement);
+                                }
+                            }
+                            // 2) Có hàng/cột đã gần đầy (chỉ còn 1 ô trống) từ TRƯỚC lượt này,
+                            //    nhưng lượt đặt vừa rồi lại không ăn được hàng/cột đó.
+                            if (!nearCompleteBeforeMove.empty()) {
+                                bool missedSomeLine = false;
+                                for (auto& line : nearCompleteBeforeMove) {
+                                    bool wasCleared = false;
+                                    if (line.isRow) {
+                                        for (int rr : cr.rows) if (rr == line.index) { wasCleared = true; break; }
+                                    } else {
+                                        for (int cc : cr.cols) if (cc == line.index) { wasCleared = true; break; }
+                                    }
+                                    if (!wasCleared) { missedSomeLine = true; break; }
+                                }
+                                if (missedSomeLine) {
+                                    roastManager.tryTrigger(RoastTrigger::MissedClear);
+                                }
+                            }
+
+                            tray[dragIndex].used = true;
+
+                            // Module 4: khi khay hết thì sinh khối mới
+                            bool allUsed = tray[0].used && tray[1].used && tray[2].used;
+                            if (allUsed) refillTray();
+
+                            // Module 4 - Việc 3: kiểm tra thua
+                            std::array<Block,3> curBlocks = {tray[0].block, tray[1].block, tray[2].block};
+                            std::array<bool,3> curUsed = {tray[0].used, tray[1].used, tray[2].used};
+if (!gameOver && isGameOver(grid, curBlocks, curUsed)) {
+                                gameOver = true;
+                                soundManager.playGameOver();
+                                // Cập nhật high score riêng của mode đang chơi
+                                if (score > getHighScore()) {
+                                    getHighScore() = score;
+                                    highScore = score;
+                                    saveHighScore(getHighScoreFile(), score);
+                                }
+                                updateLeaderboard(LEADERBOARD_FILE, "Player", score);
+                                const int LOW_SCORE_ROAST_THRESHOLD = 1500;
+                                if (score < LOW_SCORE_ROAST_THRESHOLD) {
+                                    roastManager.tryTrigger(RoastTrigger::GameOverLowScore);
+                                }
+                            }
+                        } else {
+                            // Thả khối vào vị trí không hợp lệ -> tiếng "bíp" báo sai chỗ (mở rộng từ bản MoreShapes)
+                            soundManager.playInvalid();
+                        }
+                        dragging = false;
+                        dragIndex = -1;
+                        hoverRow = hoverCol = -1;
+                        previewClearCells.clear();
+                        thinkClock.restart(); // mở rộng: bắt đầu đo lại "thời gian nghĩ" cho lượt tiếp theo
+                    }
+                }
+
+                if (const auto* kp = event->getIf<sf::Event::KeyPressed>()) {
+                    // Phím H: gợi ý (Hint System - Module 2 mở rộng)
+                    if (kp->code == sf::Keyboard::Key::H) {
+                        for (int i = 0; i < 3; i++) {
+                            if (tray[i].used) continue;
+                            int hr, hc;
+                            if (giveHint(grid, tray[i].block, hr, hc)) {
+                                std::cout << "Goi y: dat khoi " << i << " tai (" << hr << "," << hc << ")\n";
+                            }
+                        }
+                    }
+                    if (kp->code == sf::Keyboard::Key::Escape) {
+                        screen = Screen::MENU;
+                    }
+                }
+            }
+}
