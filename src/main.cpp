@@ -1909,3 +1909,556 @@ if (!gameOver && isGameOver(grid, curBlocks, curUsed)) {
                                              langOkBtn.position.y + 12.f));
             window.draw(okText);
         }
+else if (screen == Screen::MENU) {
+            // ---- Nền: vài chấm sáng lấp lánh cho đỡ trống, giống phong cách game thật ----
+            {
+                static const std::array<std::array<float, 4>, 14> sparklePts = {{
+                    {0.06f, 0.10f, 9.f, 70.f}, {0.16f, 0.28f, 5.f, 60.f}, {0.10f, 0.55f, 7.f, 55.f},
+                    {0.05f, 0.80f, 6.f, 65.f}, {0.22f, 0.70f, 4.f, 50.f}, {0.30f, 0.12f, 6.f, 55.f},
+                    {0.88f, 0.18f, 8.f, 65.f}, {0.94f, 0.42f, 5.f, 55.f}, {0.90f, 0.65f, 7.f, 60.f},
+                    {0.80f, 0.85f, 5.f, 50.f}, {0.70f, 0.08f, 4.f, 45.f}, {0.40f, 0.92f, 6.f, 55.f},
+                    {0.60f, 0.90f, 4.f, 45.f}, {0.14f, 0.40f, 3.f, 45.f}
+                }};
+                for (size_t i = 0; i < sparklePts.size(); i++) {
+                    auto& p = sparklePts[i];
+                    float twinkle = 0.7f + 0.3f * std::sin(uiPulseTime * 1.5f + static_cast<float>(i));
+                    sf::CircleShape dot(p[2]);
+                    dot.setPosition(sf::Vector2f(p[0] * WINDOW_W - p[2], p[1] * WINDOW_H - p[2]));
+                    dot.setFillColor(sf::Color(255, 255, 255, static_cast<std::uint8_t>(p[3] * twinkle)));
+                    window.draw(dot);
+                }
+            }
+
+            // ---- Tiêu đề "BLOCK BLAST" nhiều màu kiểu kẹo, kèm vương miện nhỏ phía trên ----
+            {
+                std::string full = "BLOCK BLAST";
+                static const std::array<sf::Color, 9> letterColors = {
+                    sf::Color(255, 140, 40), sf::Color(255, 90, 90), sf::Color(80, 190, 255),
+                    sf::Color(90, 200, 120), sf::Color(255, 205, 60), sf::Color(255, 120, 190),
+                    sf::Color(120, 170, 255), sf::Color(150, 220, 90), sf::Color(200, 120, 240)
+                };
+                const unsigned int titleSize = 46;
+                sf::Text measure(font, "", titleSize);
+                measure.setStyle(sf::Text::Bold);
+                std::vector<float> widths;
+                float totalW = 0.f;
+                for (char ch : full) {
+                    float w;
+                    if (ch == ' ') { w = 20.f; }
+                    else {
+                        measure.setString(sf::String(std::string(1, ch)));
+                        w = measure.getLocalBounds().size.x + 4.f;
+                    }
+                    widths.push_back(w);
+                    totalW += w;
+                }
+                float cx = WINDOW_W / 2.f - totalW / 2.f;
+                const float titleY = 130.f;
+                int colorIdx = 0;
+                for (size_t i = 0; i < full.size(); i++) {
+                    char ch = full[i];
+                    if (ch != ' ') {
+                        sf::Text t(font, sf::String(std::string(1, ch)), titleSize);
+                        t.setStyle(sf::Text::Bold);
+                        t.setFillColor(letterColors[colorIdx % letterColors.size()]);
+                        t.setOutlineColor(sf::Color(35, 30, 20));
+                        t.setOutlineThickness(2.5f);
+                        t.setPosition(sf::Vector2f(cx, titleY));
+                        window.draw(t);
+                        colorIdx++;
+                    }
+                    cx += widths[i];
+                }
+
+                // Vương miện nhỏ, canh giữa phía trên chữ
+                float crCX = WINDOW_W / 2.f;
+                float crCY = titleY - 20.f;
+                sf::ConvexShape crown;
+                crown.setPointCount(7);
+                crown.setPoint(0, sf::Vector2f(crCX - 22.f, crCY + 14.f));
+                crown.setPoint(1, sf::Vector2f(crCX - 16.f, crCY - 8.f));
+                crown.setPoint(2, sf::Vector2f(crCX - 8.f, crCY + 2.f));
+                crown.setPoint(3, sf::Vector2f(crCX, crCY - 16.f));
+                crown.setPoint(4, sf::Vector2f(crCX + 8.f, crCY + 2.f));
+                crown.setPoint(5, sf::Vector2f(crCX + 16.f, crCY - 8.f));
+                crown.setPoint(6, sf::Vector2f(crCX + 22.f, crCY + 14.f));
+                crown.setFillColor(sf::Color(255, 205, 60));
+                crown.setOutlineColor(sf::Color(200, 140, 20));
+                crown.setOutlineThickness(2.f);
+                window.draw(crown);
+            }
+
+            // ---- Phụ đề "UTC2 CORE-5" kèm biểu tượng mảnh ghép nhỏ, ngay dưới tiêu đề chính ----
+            {
+                const std::string subtitle = "UTC2 CORE-5";
+                const unsigned int subSize = 26;
+                sf::Text sub(font, sf::String(subtitle), subSize);
+                sub.setStyle(sf::Text::Bold);
+                sub.setFillColor(sf::Color(255, 205, 60));
+                sub.setOutlineColor(sf::Color(120, 70, 10));
+                sub.setOutlineThickness(2.f);
+                sf::FloatRect sb = sub.getLocalBounds();
+                const float subY = 182.f;
+                const float iconGap = 12.f;
+                const float iconSize = 20.f;
+                float totalW = sb.size.x + iconGap + iconSize;
+                float startX = WINDOW_W / 2.f - totalW / 2.f;
+                sub.setPosition(sf::Vector2f(startX - sb.position.x, subY - sb.position.y));
+                window.draw(sub);
+
+                // Biểu tượng mảnh ghép (puzzle) nhỏ, 4 ô vuông màu xen kẽ, ngay sau chữ
+                float pzX = startX + sb.size.x + iconGap;
+                float pzY = subY + sb.size.y / 2.f - iconSize / 2.f;
+                static const std::array<sf::Color, 4> pzColors = {
+                    sf::Color(255, 140, 40), sf::Color(90, 200, 120),
+                    sf::Color(80, 190, 255), sf::Color(255, 120, 190)
+                };
+                float half = iconSize / 2.f - 1.f;
+                sf::RectangleShape pz(sf::Vector2f(half, half));
+                for (int i = 0; i < 4; i++) {
+                    float ox = (i % 2 == 0) ? 0.f : half + 2.f;
+                    float oy = (i < 2) ? 0.f : half + 2.f;
+                    pz.setPosition(sf::Vector2f(pzX + ox, pzY + oy));
+                    pz.setFillColor(pzColors[i]);
+                    window.draw(pz);
+                }
+            }
+
+
+            // Không hiển thị "Thẻ Điểm cao nhất" ở Menu chính theo yêu cầu mới.
+            // High score được hiển thị riêng trong panel bên phải lúc chơi.
+
+
+            // ---- 3 nút bấm kiểu 3D, mỗi nút 1 màu + icon riêng, canh giữa màn hình ----
+            auto drawMenuButton = [&](float x, float y, float w, float h, sf::Color base,
+                                       const sf::String& label, int iconType) {
+                sf::Color outline = shade(base, 0.6f);
+                sf::RectangleShape btn(sf::Vector2f(w, h));
+                btn.setPosition(sf::Vector2f(x, y));
+                btn.setFillColor(base);
+                btn.setOutlineColor(outline);
+                btn.setOutlineThickness(-3.f);
+                window.draw(btn);
+
+                // dải sáng gloss phía trên
+                sf::RectangleShape hl(sf::Vector2f(w - 10.f, h * 0.4f));
+                hl.setPosition(sf::Vector2f(x + 5.f, y + 4.f));
+                sf::Color hlColor = shade(base, 1.35f);
+                hlColor.a = 110;
+                hl.setFillColor(hlColor);
+                window.draw(hl);
+
+                // viền đáy tối tạo bóng đổ
+                sf::RectangleShape sh(sf::Vector2f(w, h * 0.16f));
+                sh.setPosition(sf::Vector2f(x, y + h - h * 0.16f));
+                sf::Color shColor = shade(base, 0.55f);
+                shColor.a = 140;
+                sh.setFillColor(shColor);
+                window.draw(sh);
+
+                float iconCX = x + 36.f;
+                float iconCY = y + h / 2.f;
+                if (iconType == 0) {
+                    // Classic: biểu tượng vô cực (2 vòng tròn giao nhau)
+                    float r1 = 8.f;
+                    sf::CircleShape c1(r1); c1.setOrigin(sf::Vector2f(r1, r1));
+                    c1.setPosition(sf::Vector2f(iconCX - 5.f, iconCY));
+                    c1.setFillColor(sf::Color::Transparent);
+                    c1.setOutlineColor(sf::Color::White); c1.setOutlineThickness(3.f);
+                    window.draw(c1);
+                    sf::CircleShape c2(r1); c2.setOrigin(sf::Vector2f(r1, r1));
+                    c2.setPosition(sf::Vector2f(iconCX + 5.f, iconCY));
+                    c2.setFillColor(sf::Color::Transparent);
+                    c2.setOutlineColor(sf::Color::White); c2.setOutlineThickness(3.f);
+                    window.draw(c2);
+                } else if (iconType == 1) {
+                    // Time Attack: đồng hồ tròn
+                    sf::CircleShape clock_face(11.f); clock_face.setOrigin(sf::Vector2f(11.f, 11.f));
+                    clock_face.setPosition(sf::Vector2f(iconCX, iconCY));
+                    clock_face.setFillColor(sf::Color::Transparent);
+                    clock_face.setOutlineColor(sf::Color::White); clock_face.setOutlineThickness(2.5f);
+                    window.draw(clock_face);
+                    sf::RectangleShape hand_h(sf::Vector2f(6.f, 2.f)); hand_h.setPosition(sf::Vector2f(iconCX, iconCY - 1.f));
+                    hand_h.setFillColor(sf::Color::White); window.draw(hand_h);
+                    sf::RectangleShape hand_m(sf::Vector2f(2.f, 7.f)); hand_m.setPosition(sf::Vector2f(iconCX - 1.f, iconCY - 7.f));
+                    hand_m.setFillColor(sf::Color::White); window.draw(hand_m);
+                } else if (iconType == 2) {
+                    // Survival: rắn (zigzag body)
+                    static const std::array<sf::Vector2f, 4> snakePts = {{
+                        {iconCX - 10.f, iconCY + 4.f}, {iconCX - 3.f, iconCY - 4.f},
+                        {iconCX + 4.f,  iconCY + 4.f}, {iconCX + 10.f, iconCY - 2.f}
+                    }};
+                    for (int i = 0; i < 3; i++) {
+                        sf::Vertex line[2] = {
+                            sf::Vertex{snakePts[i],   sf::Color::White},
+                            sf::Vertex{snakePts[i+1], sf::Color::White}
+                        };
+                        window.draw(line, 2, sf::PrimitiveType::Lines);
+                    }
+                    sf::CircleShape head(4.f); head.setOrigin(sf::Vector2f(4.f, 4.f));
+                    head.setPosition(sf::Vector2f(iconCX + 10.f, iconCY - 2.f));
+                    head.setFillColor(sf::Color::White); window.draw(head);
+                } else if (iconType == 3) {
+                    // Huớng dẫn: quyển sách
+                    sf::RectangleShape book(sf::Vector2f(24.f, 20.f));
+                    book.setPosition(sf::Vector2f(iconCX - 12.f, iconCY - 10.f));
+                    book.setFillColor(sf::Color::White);
+                    window.draw(book);
+                    sf::RectangleShape spine(sf::Vector2f(3.f, 20.f));
+                    spine.setPosition(sf::Vector2f(iconCX - 1.5f, iconCY - 10.f));
+                    spine.setFillColor(base);
+                    window.draw(spine);
+                } else {
+                    // Thoát: cửa thoát
+                    sf::RectangleShape door(sf::Vector2f(16.f, 24.f));
+                    door.setPosition(sf::Vector2f(iconCX - 8.f, iconCY - 12.f));
+                    door.setFillColor(sf::Color::Transparent);
+                    door.setOutlineColor(sf::Color::White);
+                    door.setOutlineThickness(2.f);
+                    window.draw(door);
+                    sf::CircleShape knob(2.f);
+                    knob.setPosition(sf::Vector2f(iconCX + 2.f, iconCY - 2.f));
+                    knob.setFillColor(sf::Color::White);
+                    window.draw(knob);
+                }
+
+                sf::Text t(font, label, 24);
+                t.setStyle(sf::Text::Bold);
+                t.setFillColor(sf::Color::White);
+                t.setOutlineColor(shade(base, 0.4f));
+                t.setOutlineThickness(1.5f);
+                float textLeft = iconCX + 24.f;
+                float textAreaW = (x + w - 14.f) - textLeft;
+                sf::FloatRect tb = t.getLocalBounds();
+                t.setPosition(sf::Vector2f(textLeft + (textAreaW - tb.size.x) / 2.f - tb.position.x,
+                                            y + h / 2.f - tb.size.y / 2.f - tb.position.y));
+                window.draw(t);
+            };
+
+            // ---- Vầng sáng hình thoi mờ phía sau cụm nút ----
+            {
+                float diaCX = WINDOW_W / 2.f;
+                float diaCY = 540.f;
+                float diaR = 260.f;
+                sf::ConvexShape diamond;
+                diamond.setPointCount(4);
+                diamond.setPoint(0, sf::Vector2f(diaCX, diaCY - diaR));
+                diamond.setPoint(1, sf::Vector2f(diaCX + diaR * 0.46f, diaCY));
+                diamond.setPoint(2, sf::Vector2f(diaCX, diaCY + diaR));
+                diamond.setPoint(3, sf::Vector2f(diaCX - diaR * 0.46f, diaCY));
+                float glowPulse = 0.75f + 0.25f * std::sin(uiPulseTime * 1.2f);
+                diamond.setFillColor(sf::Color(255, 255, 255, static_cast<std::uint8_t>(14.f * glowPulse)));
+                diamond.setOutlineColor(sf::Color(180, 225, 255, static_cast<std::uint8_t>(70.f * glowPulse)));
+                diamond.setOutlineThickness(2.f);
+                window.draw(diamond);
+            }
+
+            // 5 nút: Classic / Time Attack / Survival / Hướng dẫn / Thoát
+            const float bW = 340, bH = 60, bGap = 80; // Mở rộng nút từ 240 lên 340 để chứa đủ chữ
+            const float bX = WINDOW_W / 2.f - bW / 2.f;
+            drawMenuButton(bX, 300,           bW, bH, sf::Color(255, 90,  90),  UI().btnClassic,    0);
+            drawMenuButton(bX, 300 + bGap,    bW, bH, sf::Color(52,  152, 219), UI().btnTimeAttack, 1);
+            drawMenuButton(bX, 300 + bGap*2,  bW, bH, sf::Color(46,  204, 113), UI().btnSurvival,   2);
+            drawMenuButton(bX, 300 + bGap*3,  bW, bH, sf::Color(155, 89,  182), UI().btnHowTo,      3);
+            drawMenuButton(bX, 300 + bGap*4,  bW, bH, sf::Color(74,  160, 235), UI().btnQuit,       4);
+
+            drawGearIcon(); // Mở rộng: biểu tượng Settings ở góc trên-phải
+
+            // ---- Dòng credit nhỏ ở góc dưới-phải màn hình Menu ----
+            {
+                sf::Text credit(font, U8("© 2026 UTC2 Project Team | Programming by Truc, Son, V.Minh, P.Minh, Loc"), 13);
+                credit.setStyle(sf::Text::Italic);
+                credit.setFillColor(sf::Color(255, 255, 255, 190));
+                sf::FloatRect crb = credit.getLocalBounds();
+                credit.setPosition(sf::Vector2f(WINDOW_W - crb.size.x - 16.f - crb.position.x,
+                                                 WINDOW_H - crb.size.y - 12.f - crb.position.y));
+                window.draw(credit);
+            }
+        }
+        else if (screen == Screen::HOWTO) {
+            howtoTitleText.setString(UI().howtoTitle);
+            howtoTitleText.setPosition(sf::Vector2f(WINDOW_W / 2.f - howtoTitleText.getGlobalBounds().size.x / 2.f, 32.f));
+            window.draw(howtoTitleText);
+
+            // Mở rộng: TOÀN BỘ layout màn hình Hướng dẫn giờ được tính TOẠ ĐỘ ĐỘNG dựa
+            // trên chiều cao thật của từng khối chữ, thay vì số y cố định như bản cũ.
+            // Nhờ vậy dù nội dung dài/ngắn khác nhau giữa 2 ngôn ngữ, chữ vẫn không
+            // bao giờ đè lên nhau hay tràn ra ngoài khung nữa.
+            //
+            // SỬA LỖI "chữ dính vào khung": trước đây code đo chiều cao khối chữ bằng
+            // getGlobalBounds(), nhưng hàm này chỉ đo đúng phần PIXEL MỰC THẬT SỰ của
+            // glyph (tight bounding box), KHÔNG phải chiều cao 1 dòng chữ theo font.
+            // Nếu dòng cuối cùng kết thúc bằng ký tự không có phần đuôi xuống dưới
+            // (dấu chấm, chữ không dấu...), getGlobalBounds() trả về chiều cao THẤP
+            // HƠN thực tế -> khung bên dưới được vẽ sát ngay mép chữ, nhìn như chữ
+            // dính/tràn vào viền khung. Hàm textBlockHeight() bên dưới đo chiều cao
+            // theo ĐÚNG line-height của font (giống cách trình duyệt/Word xử lý dòng
+            // chữ), luôn ổn định bất kể dòng cuối có ký tự gì.
+            auto textBlockHeight = [&](const sf::Text& t) -> float {
+                unsigned int lines = 1;
+                for (auto c : t.getString()) if (c == U'\n') lines++;
+                return static_cast<float>(lines) * font.getLineSpacing(t.getCharacterSize()) * t.getLineSpacing();
+            };
+
+            // ---- Cột trái: CƠ BẢN + ĐỘ KHÓ ----
+            const float leftX = 40.f;
+            howtoBasicTitleText.setString(UI().howtoBasicTitle);
+            howtoBasicTitleText.setPosition(sf::Vector2f(leftX, 84.f));
+            window.draw(howtoBasicTitleText);
+
+            const float basicBodyTopY = 116.f;
+            // Bẻ dòng tự động để không tràn sang cột phải (cách rightX một khoảng an toàn).
+            const float basicBodyMaxW = 540.f - leftX - 24.f;
+            howtoBasicBodyText.setString(wrapHowtoBody(font, UI().howtoBasicBody, 13, basicBodyMaxW));
+            howtoBasicBodyText.setPosition(sf::Vector2f(leftX, basicBodyTopY));
+            window.draw(howtoBasicBodyText);
+            float basicBodyBottom = basicBodyTopY + textBlockHeight(howtoBasicBodyText);
+
+            float difficultyTitleY = basicBodyBottom + 22.f;
+            howtoDifficultyTitleText.setString(UI().howtoDifficultyTitle);
+            howtoDifficultyTitleText.setPosition(sf::Vector2f(leftX, difficultyTitleY));
+            window.draw(howtoDifficultyTitleText);
+            float difficultyTitleBottom = howtoDifficultyTitleText.getGlobalBounds().position.y
+                                         + howtoDifficultyTitleText.getGlobalBounds().size.y;
+
+            float difficultyIntroY = difficultyTitleBottom + 8.f;
+            // SỬA LỖI "chữ dính vào khung độ khó": câu này dài ~550px, vượt hẳn bề
+            // rộng cột trái (~476px) nên trước đây bị tràn/dính sát vào bảng độ khó
+            // ngay bên dưới. Giờ tự động bẻ dòng theo đúng bề rộng còn lại, và dùng
+            // textBlockHeight() (đo theo line-height thật của font) thay vì
+            // getGlobalBounds() để tính đúng khoảng cách xuống bảng bên dưới dù câu
+            // giờ chiếm 1 hay nhiều dòng.
+            howtoDifficultyIntroText.setString(wrapHowtoBody(font, UI().howtoDifficultyIntro, 15, basicBodyMaxW));
+            howtoDifficultyIntroText.setPosition(sf::Vector2f(leftX, difficultyIntroY));
+            window.draw(howtoDifficultyIntroText);
+            float difficultyIntroBottom = difficultyIntroY + textBlockHeight(howtoDifficultyIntroText);
+
+            // Mở rộng: vẽ bảng độ khó 3 cột (khoảng điểm / tên mức / mô tả) canh
+            // thẳng hàng THẬT SỰ bằng tọa độ x cố định, không dùng dấu cách để
+            // canh trong 1 chuỗi (font không phải monospace nên sẽ bị lệch).
+            {
+                const float rowStartY = difficultyIntroBottom + 12.f;
+                const float rowH = 22.f; // mở rộng: thu nhỏ 1 chút để 7 mốc (thay vì 5) vẫn vừa khung
+                const float col1X = leftX;
+                float col2X = col1X;
+                float col3X = col1X;
+                for (int i = 0; i < 7; ++i) {
+                    sf::Text measure(font, sf::String("+ ") + UI().howtoDifficultyRanges[i], 15);
+                    col2X = std::max(col2X, col1X + measure.getLocalBounds().size.x + 24.f);
+                }
+                for (int i = 0; i < 7; ++i) {
+                    sf::Text measure(font, UI().difficultyTierNames[i], 15);
+                    measure.setStyle(sf::Text::Bold);
+                    col3X = std::max(col3X, col2X + measure.getLocalBounds().size.x + 20.f);
+                }
+                for (int i = 0; i < 7; ++i) {
+                    float rowY = rowStartY + i * rowH;
+                    howtoDiffRangeText[i].setString(sf::String("+ ") + UI().howtoDifficultyRanges[i]);
+                    howtoDiffRangeText[i].setPosition(sf::Vector2f(col1X, rowY));
+                    window.draw(howtoDiffRangeText[i]);
+
+                    howtoDiffNameText[i].setString(UI().difficultyTierNames[i]);
+                    howtoDiffNameText[i].setPosition(sf::Vector2f(col2X, rowY));
+                    window.draw(howtoDiffNameText[i]);
+
+                    howtoDiffDescText[i].setString(UI().howtoDifficultyDescriptors[i]);
+                    howtoDiffDescText[i].setPosition(sf::Vector2f(col3X, rowY));
+                    window.draw(howtoDiffDescText[i]);
+                }
+            }
+
+            // ---- Cột phải: 2 khung mode "ĐẤU THỜI GIAN" (xanh dương) và "SINH TỒN" (xanh lá) ----
+            // Chiều cao mỗi khung được TÍNH RA từ chiều cao thật của tiêu đề + nội dung
+            // bên trong (đo trước khi vẽ khung), nên chữ luôn nằm trọn trong khung.
+            const float rightX = 540.f;
+            const float boxW = WINDOW_W - rightX - 40.f;
+            const float boxBottomPad = 28.f; // Mở rộng: tăng đệm dưới để chữ không dính viền khung
+
+            auto drawHowtoBox = [&](float x, float y, float w, float h, sf::Color outline) {
+                sf::RectangleShape box(sf::Vector2f(w, h));
+                box.setPosition(sf::Vector2f(x, y));
+                box.setFillColor(sf::Color(255, 255, 255, 10));
+                box.setOutlineColor(outline);
+                box.setOutlineThickness(2.f);
+                window.draw(box);
+            };
+
+            // Lề trong 2 bên của khung, để đo đúng bề rộng còn lại cho chữ (trước đây
+            // chỉ trừ lề trái 22px lúc đặt vị trí chữ, nhưng lại KHÔNG trừ lề phải khi
+            // bẻ dòng -> nhiều dòng, nhất là tiếng Việt dấu rộng, vượt hẳn ra ngoài mép
+            // phải của khung. Giờ trừ đều 2 bên rồi tự động bẻ dòng theo đúng bề rộng
+            // pixel thật, nên chữ luôn nằm gọn trong khung.
+            const float boxInnerPad = 22.f;
+            const float boxTextMaxW = boxW - boxInnerPad * 2.f;
+
+            const float box1Y = 84.f;
+            howtoTaTitleText.setString(UI().howtoTimeAttackTitle);
+            howtoTaTitleText.setPosition(sf::Vector2f(rightX + boxInnerPad, box1Y + 16.f));
+            howtoTaBodyText.setString(wrapHowtoBody(font, UI().howtoTimeAttackBody, 13, boxTextMaxW));
+            const float box1BodyTopY = box1Y + 52.f;
+            howtoTaBodyText.setPosition(sf::Vector2f(rightX + boxInnerPad, box1BodyTopY));
+            float box1BodyBottom = box1BodyTopY + textBlockHeight(howtoTaBodyText);
+            float box1H = (box1BodyBottom - box1Y) + boxBottomPad;
+
+            drawHowtoBox(rightX, box1Y, boxW, box1H, sf::Color(90, 175, 235));
+            window.draw(howtoTaTitleText);
+            window.draw(howtoTaBodyText);
+
+            const float box2Y = box1Y + box1H + 22.f;
+            howtoSurvTitleText.setString(UI().howtoSurvivalTitle);
+            howtoSurvTitleText.setPosition(sf::Vector2f(rightX + boxInnerPad, box2Y + 16.f));
+            howtoSurvBodyText.setString(wrapHowtoBody(font, UI().howtoSurvivalBody, 13, boxTextMaxW));
+            const float box2BodyTopY = box2Y + 52.f;
+            howtoSurvBodyText.setPosition(sf::Vector2f(rightX + boxInnerPad, box2BodyTopY));
+            float box2BodyBottom = box2BodyTopY + textBlockHeight(howtoSurvBodyText);
+            float box2H = (box2BodyBottom - box2Y) + boxBottomPad;
+
+            drawHowtoBox(rightX, box2Y, boxW, box2H, sf::Color(100, 200, 120));
+            window.draw(howtoSurvTitleText);
+            window.draw(howtoSurvBodyText);
+
+            howtoHintText.setString(UI().howtoHint);
+            howtoHintText.setPosition(sf::Vector2f(WINDOW_W / 2.f - howtoHintText.getGlobalBounds().size.x / 2.f, WINDOW_H - 44.f));
+            window.draw(howtoHintText);
+        }
+        else if (screen == Screen::PLAY) {
+            if (!gameOver) drawGearIcon(); // Mở rộng: biểu tượng Settings ở góc trên-phải (ẩn lúc Game Over)
+
+            // Mở rộng: tính tỉ lệ lưới đang bị chiếm mỗi khung hình - dùng để làm nổi bật
+            // điểm/combo (>= 1/2) và highlight vùng "giải đố" trung tâm (>= 2/3).
+            int occupiedNow = 0;
+            for (int r = 0; r < GRID_SIZE; r++)
+                for (int c = 0; c < GRID_SIZE; c++)
+                    if (grid[r][c] != 0) occupiedNow++;
+            float gridOccupancy = occupiedNow / static_cast<float>(GRID_SIZE * GRID_SIZE);
+            bool uiHighlight = gridOccupancy >= 0.5f;
+            bool puzzleZoneActive = gridOccupancy >= (2.f / 3.f);
+            float uiPulse = uiHighlight ? (1.f + 0.16f * std::sin(uiPulseTime * 6.f)) : 1.f;
+            sf::Color uiGlowColor = uiHighlight ? sf::Color(255, 196, 60) : sf::Color::White;
+
+            // vẽ lưới (màu ô trống sáng hơn 1 chút để tương phản rõ với nền gradient mới;
+            // ô đã có khối được vẽ với hiệu ứng gloss 3D giống hệt khối trong khay, để
+            // đồng nhất - không còn cảnh khối trong khay thì "bóng" mà đặt vào lưới lại phẳng lì)
+            for (int r = 0; r < GRID_SIZE; r++) {
+                for (int c = 0; c < GRID_SIZE; c++) {
+                    float px = GRID_ORIGIN_X + c * CELL;
+                    float py = GRID_ORIGIN_Y + r * CELL;
+                    if (grid[r][c] == 0) {
+                        sf::RectangleShape cell(sf::Vector2f(CELL - 3, CELL - 3));
+                        cell.setPosition(sf::Vector2f(px, py));
+                        cell.setFillColor(sf::Color(56, 68, 150));
+                        window.draw(cell);
+                    } else if (grid[r][c] == OBSTACLE_COLOR) {
+                        // Ô chướng ngại (Survival): màu đá xám với texture nhấp nhô
+                        drawGlossyCell(window, px, py, CELL - 3, sf::Color(110, 115, 120));
+                        // Vẽ thêm crack lines để trông giống đá
+                        sf::RectangleShape crack1(sf::Vector2f(CELL * 0.3f, 2.f));
+                        crack1.setPosition(sf::Vector2f(px + CELL * 0.2f, py + CELL * 0.35f));
+                        crack1.setFillColor(sf::Color(60, 62, 65, 160));
+                        window.draw(crack1);
+                        sf::RectangleShape crack2(sf::Vector2f(2.f, CELL * 0.25f));
+                        crack2.setPosition(sf::Vector2f(px + CELL * 0.55f, py + CELL * 0.45f));
+                        crack2.setFillColor(sf::Color(60, 62, 65, 140));
+                        window.draw(crack2);
+                    } else {
+                        drawGlossyCell(window, px, py, CELL - 3, colorForId(grid[r][c]));
+                    }
+                }
+            }
+
+            // Mở rộng: viền vàng nhấp nháy quanh vùng 2x2 trung tâm khi lưới đã chật >= 2/3,
+            // báo hiệu "khu vực giải đố" - đặt trúng đây lúc lưới chật sẽ được cộng điểm thưởng.
+            if (puzzleZoneActive) {
+                float zonePulse = 0.6f + 0.4f * std::sin(uiPulseTime * 5.f);
+                sf::RectangleShape zoneOutline(sf::Vector2f(2 * CELL - 2.f, 2 * CELL - 2.f));
+                zoneOutline.setPosition(sf::Vector2f(GRID_ORIGIN_X + 3 * CELL, GRID_ORIGIN_Y + 3 * CELL));
+                zoneOutline.setFillColor(sf::Color::Transparent);
+                zoneOutline.setOutlineColor(sf::Color(255, 210, 60, static_cast<std::uint8_t>(140 + zonePulse * 100)));
+                zoneOutline.setOutlineThickness(3.f);
+                window.draw(zoneOutline);
+            }
+
+            // Mở rộng (từ bản MoreShapes): nhấp nháy sáng các ô thuộc hàng/cột SẼ bị xóa
+            // nếu thả khối ngay tại vị trí đang hover, giúp người chơi dễ nhận biết và
+            // có thể kéo sang chỗ khác nếu chưa muốn xóa ở đó.
+            if (dragging && hoverValid && !previewClearCells.empty()) {
+                float pulse = 0.5f + 0.5f * std::sin(previewPulseTime * 8.f);
+                std::uint8_t glowAlpha = static_cast<std::uint8_t>(110 + pulse * 110);
+                for (auto& rc : previewClearCells) {
+                    sf::RectangleShape hi(sf::Vector2f(CELL - 3, CELL - 3));
+                    hi.setPosition(sf::Vector2f(GRID_ORIGIN_X + rc.second * CELL, GRID_ORIGIN_Y + rc.first * CELL));
+                    hi.setFillColor(sf::Color(255, 241, 118, glowAlpha));
+                    hi.setOutlineColor(sf::Color(255, 255, 255, glowAlpha));
+                    hi.setOutlineThickness(2.f);
+                    window.draw(hi);
+                }
+            }
+
+            // vẽ ô xem trước (preview) khi đang kéo
+            if (dragging) {
+                for (auto& cellOff : tray[dragIndex].block.cells) {
+                    int r = hoverRow + cellOff.first;
+                    int c = hoverCol + cellOff.second;
+                    if (r >= 0 && r < GRID_SIZE && c >= 0 && c < GRID_SIZE) {
+                        sf::RectangleShape prev(sf::Vector2f(CELL - 3, CELL - 3));
+                        prev.setPosition(sf::Vector2f(GRID_ORIGIN_X + c * CELL, GRID_ORIGIN_Y + r * CELL));
+                        prev.setFillColor(hoverValid ? sf::Color(46, 204, 113, 160) : sf::Color(231, 76, 60, 160));
+                        window.draw(prev);
+                    }
+                }
+            }
+
+            // vẽ khay khối (khối chưa dùng, không phải khối đang kéo)
+            for (int i = 0; i < 3; i++) {
+                if (tray[i].used) continue;
+                if (dragging && dragIndex == i) continue;
+
+                sf::RectangleShape slot(sf::Vector2f(traySlotW - 10, traySlotH - 10));
+                slot.setPosition(tray[i].basePos);
+                slot.setFillColor(sf::Color(50, 62, 138));
+                window.draw(slot);
+
+                auto box = blockBoundingBox(tray[i].block);
+                const float PREVIEW_CELL = 24.f;
+                float bw = box.second * PREVIEW_CELL, bh = box.first * PREVIEW_CELL;
+                float sx = tray[i].basePos.x + (traySlotW - 10 - bw) / 2.f;
+                float sy = tray[i].basePos.y + (traySlotH - 10 - bh) / 2.f;
+                drawBlock(window, tray[i].block, sx, sy, PREVIEW_CELL, 3.f);
+            }
+
+            // vẽ khối đang kéo tại vị trí chuột
+            if (dragging) {
+                auto box = blockBoundingBox(tray[dragIndex].block);
+                float sx = dragPos.x - (box.second * CELL) / 2.f;
+                float sy = dragPos.y - (box.first * CELL) / 2.f;
+                drawBlock(window, tray[dragIndex].block, sx, sy, static_cast<float>(CELL), 3.f);
+            }
+
+            // Reset view mặc định TRƯỚC khi vẽ panel/HUD/nút bấm: hiệu ứng rung màn hình
+            // (Pressure Overload) chỉ nên làm rung phần lưới/nền, KHÔNG được làm lệch vị
+            // trí các nút bấm so với toạ độ chuột thực (vốn tính theo view mặc định).
+            window.setView(gameView);
+
+            // Mở rộng: panel bên TRÁI (tab ĐIỂM + ĐỘ KHÓ) và bên PHẢI (ĐIỂM CAO NHẤT +
+            // COMBO), cỡ chữ được phóng to rõ rệt so với HUD nhỏ trước đây. Khi lưới đã
+            // chiếm >= 1/2, panel Điểm/Combo nhấp nháy nổi bật (đổi màu + phóng to nhẹ)
+            // giống hiệu ứng cũ, để không mất đi cảnh báo trực quan đó.
+            // Canh giữa 1 sf::Text theo chiều NGANG trong đoạn [boxX, boxX+boxW], trả về
+            // toạ độ X cần set để chữ nằm đều 2 bên (bù trừ phần lề trái do font tạo ra).
+            auto centerTextX = [](const sf::Text& t, float boxX, float boxW) {
+                sf::FloatRect b = t.getLocalBounds();
+                return boxX + (boxW - b.size.x) / 2.f - b.position.x;
+            };
+
+            auto drawTab = [&](float x, float y, float w, float h, const sf::String& label,
+                                const sf::String& value, sf::Color accent, float valueSize,
+                                float pulse, sf::Color pulseColor) {
+                sf::RectangleShape bg(sf::Vector2f(w, h));
+                bg.setPosition(sf::Vector2f(x, y));
+                bg.setFillColor(sf::Color(18, 20, 40, 210));
+                bg.setOutlineColor(sf::Color(accent.r, accent.g, accent.b, 160));
+                bg.setOutlineThickness(2.f);
+                window.draw(bg);
+
+                const float innerPad = 10.f; // lề trong 2 bên để chữ không dính sát viền
+                const float innerW = w - innerPad * 2.f;
