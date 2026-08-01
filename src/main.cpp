@@ -2462,3 +2462,319 @@ else if (screen == Screen::MENU) {
 
                 const float innerPad = 10.f; // lề trong 2 bên để chữ không dính sát viền
                 const float innerW = w - innerPad * 2.f;
+               // ---- Nhãn (label): tự thu nhỏ cỡ chữ nếu quá rộng so với khung (giống
+                // hệt cơ chế của value bên dưới), rồi mới canh giữa theo chiều ngang.
+                // TRƯỚC ĐÂY chỉ value mới tự co chữ, còn label luôn cố định cỡ 15px - nên
+                // các nhãn tiếng Việt dài hơn xuất hiện riêng ở Time Attack/Survival (VD:
+                // "THỜI GIAN", "⚠ PRESSURE RISING", "☠ CRITICAL PRESSURE") bị trồi chữ ra
+                // ngoài khung, trong khi nhãn ngắn của Classic ("ĐIỂM", "ĐỘ KHÓ") tình cờ
+                // vừa khít nên trông vẫn bình thường.
+                float labelSize = 15.f;
+                sf::Text labelText(font, label, static_cast<unsigned int>(labelSize));
+                labelText.setStyle(sf::Text::Bold);
+                while (labelSize > 10.f && labelText.getLocalBounds().size.x > innerW) {
+                    labelSize -= 1.f;
+                    labelText.setCharacterSize(static_cast<unsigned int>(labelSize));
+                }
+                labelText.setFillColor(sf::Color(190, 198, 230));
+                labelText.setPosition(sf::Vector2f(centerTextX(labelText, x, w), y + 10.f));
+                window.draw(labelText);
+
+                // ---- Giá trị (value): tự thu nhỏ cỡ chữ nếu quá rộng so với khung,
+                // rồi canh giữa cả chiều ngang lẫn chiều dọc trong phần còn lại bên dưới label ----
+                float fittedSize = valueSize;
+                sf::Text valueText(font, value, static_cast<unsigned int>(fittedSize));
+                valueText.setStyle(sf::Text::Bold);
+                while (fittedSize > 12.f && valueText.getLocalBounds().size.x > innerW) {
+                    fittedSize -= 1.f;
+                    valueText.setCharacterSize(static_cast<unsigned int>(fittedSize));
+                }
+                valueText.setFillColor(pulse > 1.001f ? pulseColor : accent);
+                valueText.setOutlineColor(sf::Color(10, 10, 20));
+                valueText.setOutlineThickness(1.5f);
+                valueText.setScale(sf::Vector2f(pulse, pulse));
+
+                const float valueAreaTop = y + 34.f;      // ngay dưới label
+                const float valueAreaBottom = y + h - 8.f; // chừa lề dưới
+                sf::FloatRect vb = valueText.getLocalBounds();
+                float valueH = vb.size.y * pulse;
+                float valueY = valueAreaTop + (valueAreaBottom - valueAreaTop - valueH) / 2.f - vb.position.y * pulse;
+                valueText.setPosition(sf::Vector2f(centerTextX(valueText, x, w), valueY));
+                window.draw(valueText);
+            };
+
+            // ---- Panel trái: ĐIỂM + ĐỘ KHÓ ----
+            drawTab(LEFT_PANEL_X, GRID_ORIGIN_Y, LEFT_PANEL_W, 108.f,
+                    UI().panelScoreLabel, sf::String(std::to_string(score)),
+                    sf::Color(120, 200, 255), 44.f, uiPulse, uiGlowColor);
+
+            int tier = difficultyTier(score);
+            static const std::array<sf::Color, 7> TIER_ACCENT = {
+                sf::Color(140, 200, 255), sf::Color(120, 220, 170), sf::Color(255, 205, 80),
+                sf::Color(255, 140, 90), sf::Color(255, 70, 70),
+                sf::Color(255, 40, 90),  // Điên rồ: đỏ hồng rực cảnh báo
+                sf::Color(255, 215, 60)  // Bậc thầy: vàng kim nổi bật trên nền đen
+            };
+            drawTab(LEFT_PANEL_X, GRID_ORIGIN_Y + 120.f, LEFT_PANEL_W, 92.f,
+                    UI().panelDifficultyLabel, UI().difficultyTierNames[tier],
+                    TIER_ACCENT[tier], 26.f, 1.f, TIER_ACCENT[tier]);
+
+            // ---- Panel phải: ĐIỂM CAO NHẤT + COMBO ----
+            drawTab(RIGHT_PANEL_X, GRID_ORIGIN_Y, RIGHT_PANEL_W, 108.f,
+                    UI().panelHighScoreLabel, sf::String(std::to_string(highScore)),
+                    sf::Color(255, 205, 80), 40.f, 1.f, sf::Color(255, 205, 80));
+
+            drawTab(RIGHT_PANEL_X, GRID_ORIGIN_Y + 120.f, RIGHT_PANEL_W, 108.f,
+                    UI().panelComboLabel, sf::String(std::to_string(streak)),
+                    sf::Color(255, 110, 140), 44.f, uiPulse, uiGlowColor);
+
+            // Góc dưới của tab Combo: số khối còn lại trước khi mất combo
+            if (streak > 0) {
+                int blocksLeftBeforeComboLoss = COMBO_GRACE_BLOCKS - missStreak;
+                if (blocksLeftBeforeComboLoss < 0) blocksLeftBeforeComboLoss = 0;
+                sf::String comboLeftStr = UI().hudComboBlocksPrefix
+                                         + sf::String(std::to_string(blocksLeftBeforeComboLoss))
+                                         + UI().hudComboBlocksSuffix;
+                sf::Text comboLeftText(font, comboLeftStr, 14);
+                comboLeftText.setStyle(sf::Text::Bold);
+                comboLeftText.setFillColor(missStreak > 0 ? sf::Color(255, 160, 110) : sf::Color(180, 190, 220));
+                comboLeftText.setPosition(sf::Vector2f(RIGHT_PANEL_X + 14.f, GRID_ORIGIN_Y + 120.f + 92.f));
+                window.draw(comboLeftText);
+            }
+
+            // ---- Time Attack: đồng hồ đếm ngược ở góc dưới panel trái ----
+            if (currentMode == GameMode::TIME_ATTACK) {
+                int tSec = static_cast<int>(timeAttackRemaining);
+                int mm = tSec / 60, ss = tSec % 60;
+                char timeBuf[16];
+                std::snprintf(timeBuf, sizeof(timeBuf), "%02d:%02d", mm, ss);
+                // Đổi màu đỏ khi còn ít hơn 30 giây
+                sf::Color timerColor = (timeAttackRemaining < 30.f)
+                    ? sf::Color(255, static_cast<std::uint8_t>(50 + 100 * std::abs(std::sin(uiPulseTime * 4.f))), 50)
+                    : sf::Color(80, 230, 180);
+                drawTab(LEFT_PANEL_X, GRID_ORIGIN_Y + 120.f + 100.f, LEFT_PANEL_W, 92.f,
+                        UI().timeAttackLabel, sf::String(timeBuf),
+                        timerColor, 32.f, 1.f, timerColor);
+            }
+
+            // ---- Classic: thanh thời gian đã chơi (đếm LÊN, không giới hạn) ----
+            if (currentMode == GameMode::CLASSIC) {
+                int tSec = static_cast<int>(classicPlayClock.getElapsedTime().asSeconds());
+                int hh = tSec / 3600, mm = (tSec % 3600) / 60, ss = tSec % 60;
+                char timeBuf[16];
+                if (hh > 0) {
+                    std::snprintf(timeBuf, sizeof(timeBuf), "%d:%02d:%02d", hh, mm, ss);
+                } else {
+                    std::snprintf(timeBuf, sizeof(timeBuf), "%02d:%02d", mm, ss);
+                }
+                drawTab(LEFT_PANEL_X, GRID_ORIGIN_Y + 120.f + 100.f, LEFT_PANEL_W, 92.f,
+                        UI().classicPlayTimeLabel, sf::String(timeBuf),
+                        sf::Color(150, 210, 255), 30.f, 1.f, sf::Color(150, 210, 255));
+            }
+
+            // ---- Survival: số khối đã đặt và tới khi sinh obstacle tiếp theo ----
+            if (currentMode == GameMode::SURVIVAL) {
+                int nextObstacleIn = 15 - (totalBlocksPlaced - lastObstacleAt);
+                if (nextObstacleIn < 0) nextObstacleIn = 0;
+                sf::String survStr = sf::String(std::to_string(nextObstacleIn));
+                drawTab(LEFT_PANEL_X, GRID_ORIGIN_Y + 120.f + 100.f, LEFT_PANEL_W, 92.f,
+                        UI().survivalObstacleLabel, survStr,
+                        sf::Color(180, 140, 100), 32.f, 1.f, sf::Color(180, 140, 100));
+            }
+
+            // ---- Survival: thanh Pressure (0-100) ----
+            if (currentMode == GameMode::SURVIVAL) {
+                int lvl = pressureLevel(pressure);
+
+                // Nhãn đổi thành cảnh báo theo Pressure Level hiện tại.
+                sf::String pbLabelStr = UI().pressureLabel;
+                sf::Color labelColor = sf::Color(120, 220, 140);
+                if (lvl == 2)      { pbLabelStr = UI().pressureWarnRising;   labelColor = sf::Color(230, 200, 60); }
+                else if (lvl == 3) { pbLabelStr = UI().pressureWarnHigh;     labelColor = sf::Color(240, 130, 50); }
+                else if (lvl == 4) { pbLabelStr = UI().pressureWarnCritical; labelColor = sf::Color(230, 50, 50); }
+
+                // Màu thanh nội suy mượt liên tục theo giá trị (không đổi đột ngột giữa các mốc):
+                // xanh lá (0) -> vàng (~33) -> cam (~66) -> đỏ (100).
+                auto pressureColorAt = [](float p) -> sf::Color {
+                    struct Stop { float pos; sf::Color c; };
+                    static const Stop stops[4] = {
+                        {0.f,   sf::Color(60, 200, 100)},
+                        {33.f,  sf::Color(230, 200, 60)},
+                        {66.f,  sf::Color(240, 130, 50)},
+                        {100.f, sf::Color(230, 50, 50)}
+                    };
+                    if (p <= stops[0].pos) return stops[0].c;
+                    for (int i = 0; i < 3; i++) {
+                        if (p <= stops[i+1].pos) {
+                            float t = (p - stops[i].pos) / (stops[i+1].pos - stops[i].pos);
+                            auto L = [&](std::uint8_t a, std::uint8_t b) {
+                                return static_cast<std::uint8_t>(a + (b - a) * t);
+                            };
+                            return sf::Color(L(stops[i].c.r, stops[i+1].c.r),
+                                              L(stops[i].c.g, stops[i+1].c.g),
+                                              L(stops[i].c.b, stops[i+1].c.b));
+                        }
+                    }
+                    return stops[3].c;
+                };
+                sf::Color barColor = pressureColorAt(pressureDisplay);
+
+                // Rung nhẹ viền khung ở DANGER (Lv3), rung mạnh hơn ở CRITICAL (Lv4).
+                float jitterMag = (lvl == 3) ? 1.2f : (lvl == 4) ? 2.6f : 0.f;
+                float jx = jitterMag * std::sin(uiPulseTime * 30.f);
+                float jy = jitterMag * std::cos(uiPulseTime * 26.f);
+
+                float pbX = LEFT_PANEL_X + jx, pbY = GRID_ORIGIN_Y + 120.f + 100.f + 92.f + 10.f + jy;
+                float pbW = LEFT_PANEL_W, pbH = 58.f;
+
+                sf::RectangleShape pbg(sf::Vector2f(pbW, pbH));
+                pbg.setPosition(sf::Vector2f(pbX, pbY));
+                pbg.setFillColor(sf::Color(18, 20, 40, 210));
+                pbg.setOutlineColor(sf::Color(barColor.r, barColor.g, barColor.b, 170));
+                pbg.setOutlineThickness(lvl >= 3 ? 2.6f : 2.f);
+                window.draw(pbg);
+
+                // Cũng tự thu nhỏ cỡ chữ như các label khác - nhãn cảnh báo dài
+                // ("⚠ PRESSURE RISING", "☠ CRITICAL PRESSURE") dễ tràn khung 234px hơn nhãn
+                // mặc định "PRESSURE" ngắn gọn.
+                float pbLabelSize = 14.f;
+                sf::Text pbLabel(font, pbLabelStr, static_cast<unsigned int>(pbLabelSize));
+                pbLabel.setStyle(sf::Text::Bold);
+                while (pbLabelSize > 10.f && pbLabel.getLocalBounds().size.x > pbW - 12.f) {
+                    pbLabelSize -= 1.f;
+                    pbLabel.setCharacterSize(static_cast<unsigned int>(pbLabelSize));
+                }
+                pbLabel.setFillColor(labelColor);
+                pbLabel.setPosition(sf::Vector2f(centerTextX(pbLabel, pbX, pbW), pbY + 6.f));
+                window.draw(pbLabel);
+
+                float barX = pbX + 10.f, barY = pbY + 27.f, barW = pbW - 20.f, barH = 14.f;
+                sf::RectangleShape barBg(sf::Vector2f(barW, barH));
+                barBg.setPosition(sf::Vector2f(barX, barY));
+                barBg.setFillColor(sf::Color(40, 42, 60));
+                barBg.setOutlineColor(sf::Color(90, 94, 120));
+                barBg.setOutlineThickness(1.f);
+                window.draw(barBg);
+
+                float fillRatio = std::max(0.f, std::min(1.f, pressureDisplay / 100.f));
+                // Hiệu ứng nhấp nháy/pulse ở mức DANGER (chớp ngắn) và CRITICAL (nhấp nháy liên tục).
+                float glowPulse = 1.f;
+                if (lvl == 3) glowPulse = 0.82f + 0.18f * std::abs(std::sin(uiPulseTime * 5.f));
+                else if (lvl == 4) glowPulse = 0.55f + 0.45f * std::abs(std::sin(uiPulseTime * 9.f));
+                sf::Color fillColor = barColor;
+                fillColor.a = static_cast<std::uint8_t>(255 * glowPulse);
+
+                if (barW * fillRatio > 0.f) {
+                    sf::RectangleShape barFill(sf::Vector2f(barW * fillRatio, barH));
+                    barFill.setPosition(sf::Vector2f(barX, barY));
+                    barFill.setFillColor(fillColor);
+                    window.draw(barFill);
+                }
+
+                sf::Text pbValue(font, sf::String(std::to_string(pressure)) + sf::String(" / 100"), 13);
+                pbValue.setStyle(sf::Text::Bold);
+                pbValue.setFillColor(sf::Color(220, 224, 240));
+                pbValue.setPosition(sf::Vector2f(centerTextX(pbValue, pbX, pbW), barY + barH + 4.f));
+                window.draw(pbValue);
+            }
+
+            // Hiệu ứng "+điểm" / "Amazing!" bay lên và mờ dần khi xóa hàng/cột
+            for (auto& p : scorePopups) {
+                float t = p.age / POPUP_LIFETIME; // 0 -> 1
+                float floatUpY = p.y - t * 60.f;
+                float alphaF = 1.f - t;
+                if (alphaF < 0.f) alphaF = 0.f;
+                std::uint8_t alpha = static_cast<std::uint8_t>(alphaF * 255);
+                float scalePop = (t < 0.15f) ? (0.7f + (t / 0.15f) * 0.4f) : 1.0f;
+
+                if (p.showAmount) {
+                    sf::Text amountText(font, sf::String("+") + sf::String(std::to_string(p.amount)), 30);
+                    amountText.setStyle(sf::Text::Bold);
+                    amountText.setFillColor(sf::Color(255, 255, 255, alpha));
+                    amountText.setOutlineColor(sf::Color(220, 40, 130, alpha));
+                    amountText.setOutlineThickness(2.f);
+                    amountText.setScale(sf::Vector2f(scalePop, scalePop));
+                    amountText.setPosition(sf::Vector2f(
+                        p.x - amountText.getGlobalBounds().size.x / 2.f, floatUpY - 30.f));
+                    window.draw(amountText);
+                }
+
+                if (p.label.getSize() > 0) {
+                    sf::Text labelText(font, p.label, 22);
+                    labelText.setStyle(sf::Text::Bold);
+                    labelText.setFillColor(sf::Color(80, 230, 220, alpha));
+                    labelText.setOutlineColor(sf::Color(220, 40, 130, alpha));
+                    labelText.setOutlineThickness(2.f);
+                    labelText.setScale(sf::Vector2f(scalePop, scalePop));
+                    labelText.setPosition(sf::Vector2f(
+                        p.x - labelText.getGlobalBounds().size.x / 2.f, floatUpY + 2.f));
+                    window.draw(labelText);
+                }
+            }
+
+            if (gameOver) {
+                sf::RectangleShape overlay(sf::Vector2f(WINDOW_W, WINDOW_H));
+                overlay.setFillColor(sf::Color(0, 0, 0, 180));
+                window.draw(overlay);
+
+                // Survival: "Màn hình phủ một lớp đỏ ngắn" ngay khi Pressure Overload xảy ra,
+                // mờ dần trong khoảng 0.5 giây (đi kèm hiệu ứng rung màn hình ở trên).
+                if (pressureGameOver && pressureShakeTimer > 0.f) {
+                    sf::RectangleShape redFlash(sf::Vector2f(WINDOW_W, WINDOW_H));
+                    std::uint8_t flashAlpha = static_cast<std::uint8_t>(150.f * (pressureShakeTimer / 0.5f));
+                    redFlash.setFillColor(sf::Color(220, 20, 20, flashAlpha));
+                    window.draw(redFlash);
+                }
+
+                float titleY = 260.f;
+                if (pressureGameOver) {
+                    // "PRESSURE OVERLOAD" / "You Couldn't Survive..." hiển thị phía trên tiêu đề
+                    // GAME OVER thông thường, giải thích rõ nguyên nhân thua cuộc là do Pressure.
+                    sf::Text overloadLine1(font, UI().pressureOverloadLine1, 30);
+                    overloadLine1.setStyle(sf::Text::Bold);
+                    overloadLine1.setFillColor(sf::Color(255, 60, 60));
+                    overloadLine1.setOutlineColor(sf::Color(40, 0, 0));
+                    overloadLine1.setOutlineThickness(2.f);
+                    overloadLine1.setPosition(sf::Vector2f(
+                        WINDOW_W/2.f - overloadLine1.getGlobalBounds().size.x/2.f, 175.f));
+                    window.draw(overloadLine1);
+
+                    sf::Text overloadLine2(font, UI().pressureOverloadLine2, 18);
+                    overloadLine2.setStyle(sf::Text::Italic);
+                    overloadLine2.setFillColor(sf::Color(255, 170, 170));
+                    overloadLine2.setPosition(sf::Vector2f(
+                        WINDOW_W/2.f - overloadLine2.getGlobalBounds().size.x/2.f, 215.f));
+                    window.draw(overloadLine2);
+                }
+
+                overText.setString(UI().gameOverTitle);
+                overText.setPosition(sf::Vector2f(WINDOW_W/2.f - overText.getGlobalBounds().size.x/2.f, titleY));
+                window.draw(overText);
+
+                sf::String fs = UI().finalScorePrefix + sf::String(std::to_string(score))
+                               + UI().finalScoreHighSuffixOpen + sf::String(std::to_string(highScore)) + sf::String(")");
+                finalScoreText.setString(fs);
+                finalScoreText.setPosition(sf::Vector2f(WINDOW_W/2.f - finalScoreText.getGlobalBounds().size.x/2.f, 340));
+                window.draw(finalScoreText);
+
+                // (Đã ẩn retryText vì có 2 nút to Trang Chủ/Chơi lại rồi)
+
+                // Mở rộng: 2 nút bấm to, rõ ràng "Trang chủ" / "Chơi lại" (giống thiết kế
+                // tham khảo) - vẫn giữ nguyên phím tắt R/ESC ở trên cho ai muốn dùng bàn phím.
+                auto drawGameOverBtn = [&](const sf::FloatRect& rect, const sf::String& label) {
+                    sf::RectangleShape btn(rect.size);
+                    btn.setPosition(rect.position);
+                    btn.setFillColor(sf::Color(46, 204, 113));
+                    btn.setOutlineColor(sf::Color(39, 174, 96));
+                    btn.setOutlineThickness(3.f);
+                    window.draw(btn);
+                    sf::Text t(font, label, 24);
+                    t.setFillColor(sf::Color::White);
+                    t.setPosition(sf::Vector2f(rect.position.x + rect.size.x/2.f - t.getGlobalBounds().size.x/2.f,
+                                                rect.position.y + rect.size.y/2.f - t.getGlobalBounds().size.y/2.f - 6.f));
+                    window.draw(t);
+                };
+                drawGameOverBtn(homeBtn, UI().btnHome);
+                drawGameOverBtn(replayBtn, UI().btnReplay);
+            }
+
