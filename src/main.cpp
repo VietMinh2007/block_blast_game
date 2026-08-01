@@ -1097,3 +1097,60 @@ if (appIcon.loadFromFile("assets/icon.png")) {
         if (screen == Screen::SPLASH && splashClock.getElapsedTime().asSeconds() >= SPLASH_TOTAL_DURATION) {
             screen = Screen::LANGUAGE;
         }
+
+        // ----- Survival: nội suy mượt thanh Pressure về giá trị thực mỗi khung hình -----
+        // (yêu cầu: Pressure tăng/giảm dù chỉ 1 điểm cũng phải thấy thanh di chuyển ngay,
+        // không chờ tới mốc lớn - nên ta lerp "pressureDisplay" về "pressure" mỗi frame).
+        float pressureDiff = static_cast<float>(pressure) - pressureDisplay;
+        pressureDisplay += pressureDiff * std::min(1.f, dt * 8.f);
+        if (std::abs(pressureDiff) < 0.05f) pressureDisplay = static_cast<float>(pressure);
+        if (pressureShakeTimer > 0.f) pressureShakeTimer = std::max(0.f, pressureShakeTimer - dt);
+
+        // Cập nhật tuổi các popup "+điểm" đang bay, xóa popup đã hết hạn
+        for (auto& p : scorePopups) p.age += dt;
+        scorePopups.erase(
+            std::remove_if(scorePopups.begin(), scorePopups.end(),
+                            [&](const ScorePopup& p) { return p.age >= POPUP_LIFETIME; }),
+            scorePopups.end());
+
+        // ----- Time Attack: đếm ngược thời gian -----
+        if (screen == Screen::PLAY && !gameOver && currentMode == GameMode::TIME_ATTACK) {
+            timeAttackRemaining -= dt;
+            if (timeAttackRemaining <= 0.f) {
+                timeAttackRemaining = 0.f; // Đảm bảo đồng hồ dừng chính xác ở 00:00
+                gameOver = true;
+                soundManager.playGameOver();
+                if (score > getHighScore()) {
+                    getHighScore() = score;
+                    highScore = score;
+                    saveHighScore(getHighScoreFile(), score);
+                }
+                updateLeaderboard(LEADERBOARD_FILE, "Player", score);
+
+                // Thêm Roastbot mắng mỏ nếu điểm quá thấp khi hết giờ
+                const int LOW_SCORE_ROAST_THRESHOLD = 1500;
+                if (score < LOW_SCORE_ROAST_THRESHOLD) {
+                    roastManager.tryTrigger(RoastTrigger::GameOverLowScore);
+                }
+            }
+        }
+
+        while (const std::optional event = window.pollEvent()) {
+            if (event->is<sf::Event::Closed>()) window.close();
+
+            // Fix lỗi bung/kéo dãn hình khi bật fullscreen (maximize) hoặc resize cửa sổ:
+            // cập nhật lại viewport (letterbox) của gameView theo size mới của cửa sổ,
+            // thay vì để SFML giữ nguyên viewport 0..1 cũ (gây kéo dãn ảnh) và lệch tọa
+            // độ chuột so với những gì hiển thị trên màn hình.
+            if (const auto* resized = event->getIf<sf::Event::Resized>()) {
+                updateLetterboxView(gameView, resized->size.x, resized->size.y);
+                window.setView(gameView);
+            }
+
+            // Phím M: bật/tắt nhạc nền, hoạt động ở mọi màn hình (mở rộng từ bản MoreShapes)
+            if (const auto* kpMute = event->getIf<sf::Event::KeyPressed>()) {
+                if (kpMute->code == sf::Keyboard::Key::M) {
+                    musicMuted = !musicMuted;
+                    soundManager.setMusicVolume(musicMuted ? 0.f : 32.f);
+                }
+            }
