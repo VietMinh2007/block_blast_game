@@ -290,3 +290,186 @@ struct TraySlot {
     bool used;
     sf::Vector2f basePos; // vị trí gốc trong khay để vẽ khi không kéo
 };
+
+// ===================== MÀN HÌNH DISCLAIMER =====================
+// Một "từ" có màu riêng, dùng để dựng đoạn văn có phần tô màu giống ảnh
+// mẫu, rồi tự động xuống dòng (word-wrap) theo chiều rộng cửa sổ.
+struct ColoredWord {
+    sf::String text;
+    sf::Color color;
+};
+using Paragraph = std::vector<ColoredWord>;
+
+static void appendWords(Paragraph& p, const std::string& utf8Text, sf::Color color) {
+    std::istringstream iss(utf8Text);
+    std::string token;
+    while (iss >> token) {
+        p.push_back({U8(token), color});
+    }
+}
+
+// Một từ đã được layout sẵn: nội dung + vị trí (x, y) tuyệt đối trên màn hình.
+struct LaidOutWord {
+    sf::String text;
+    sf::Color color;
+    float x, y;
+};
+
+// Word-wrap toàn bộ danh sách đoạn văn thành các từ đã có toạ độ, trả về
+// vị trí Y ngay sau đoạn văn cuối cùng.
+static float layoutParagraphs(const sf::Font& font, const std::vector<Paragraph>& paragraphs,
+                               float originX, float originY, float maxWidth,
+                               unsigned int charSize, float lineHeight, float paragraphGap,
+                               std::vector<LaidOutWord>& out) {
+    float curY = originY;
+    sf::Text measurer(font, "", charSize);
+    measurer.setString(" .");
+    float dotAndSpaceW = measurer.getLocalBounds().size.x;
+    measurer.setString(".");
+    float spaceW = dotAndSpaceW - measurer.getLocalBounds().size.x;
+
+    for (const auto& para : paragraphs) {
+        float curX = originX;
+        for (const auto& w : para) {
+            measurer.setString(w.text);
+            float wWidth = measurer.getLocalBounds().size.x;
+            if (curX > originX && curX + wWidth > originX + maxWidth) {
+                curX = originX;
+                curY += lineHeight;
+            }
+            out.push_back({w.text, w.color, curX, curY});
+            curX += wWidth + spaceW;
+        }
+        curY += lineHeight + paragraphGap;
+    }
+    return curY;
+}
+
+// Lõi dùng chung: bẻ 1 chuỗi sf::String (đã tách sẵn theo khoảng trắng) thành
+// nhiều dòng không vượt quá maxWidth pixel, đo đúng theo style (bold hay
+// không) sẽ dùng để vẽ, để tránh lệch giữa lúc đo và lúc vẽ thật.
+static std::vector<sf::String> wrapWordsToWidth(const sf::Font& font, const sf::String& full,
+                                                 unsigned int charSize, float maxWidth, bool bold) {
+    std::vector<sf::String> words;
+    sf::String word;
+    for (std::size_t i = 0; i < full.getSize(); i++) {
+        char32_t ch = full[i];
+        if (ch == static_cast<std::uint32_t>(' ')) {
+            if (!word.isEmpty()) { words.push_back(word); word.clear(); }
+        } else {
+            word += static_cast<char32_t>(ch);
+        }
+    }
+    if (!word.isEmpty()) words.push_back(word);
+
+    std::vector<sf::String> lines;
+    sf::String currentLine;
+    sf::Text measurer(font, "", charSize);
+    if (bold) measurer.setStyle(sf::Text::Bold);
+    for (auto& w : words) {
+        sf::String candidate = currentLine.isEmpty() ? w : (currentLine + sf::String(" ") + w);
+        measurer.setString(candidate);
+        float width = measurer.getLocalBounds().size.x;
+        if (width > maxWidth && !currentLine.isEmpty()) {
+            lines.push_back(currentLine);
+            currentLine = w;
+        } else {
+            currentLine = candidate;
+        }
+    }
+    if (!currentLine.isEmpty()) lines.push_back(currentLine);
+    return lines;
+}
+
+// Mở rộng: word-wrap 1 câu UTF-8 đơn giản (tách theo khoảng trắng) thành nhiều dòng
+// sao cho mỗi dòng không vượt quá maxWidth pixel, dùng để hiển thị câu roast bên
+// trong bong bóng thoại của "robot mỏ hỗn".
+
+    // Word-wrap cho chuỗi UTF-8 (tiếng Việt có dấu) — đảm bảo không cắt byte UTF-8
+// và đo đúng chiều rộng theo style Bold để tránh tràn khung.
+// Word-wrap cho chuỗi UTF‑8 (tiếng Việt có dấu) — tương thích SFML 3
+static std::vector<sf::String> wrapUtf8Text(const sf::Font& font,
+    const std::string& utf8Text,
+    unsigned int charSize,
+    float maxWidth)
+{
+    // Chuyển toàn bộ sang UTF‑32 để tránh cắt byte UTF‑8
+    sf::String full = sf::String::fromUtf8(utf8Text.begin(), utf8Text.end());
+
+    std::vector<sf::String> words;
+    sf::String word;
+    for (std::size_t i = 0; i < full.getSize(); i++) {
+        if (full[i] == U' ') {
+            if (!word.isEmpty()) { words.push_back(word); word.clear(); }
+        }
+        else {
+            word += full[i];
+        }
+    }
+    if (!word.isEmpty()) words.push_back(word);
+
+    std::vector<sf::String> lines;
+    sf::String currentLine;
+    sf::Text measurer(font, "", charSize);
+    measurer.setStyle(sf::Text::Bold);
+
+    // đo đúng style Bold như khi vẽ thật
+
+    for (auto& w : words) {
+        sf::String candidate = currentLine.isEmpty() ? w : (currentLine + U' ' + w);
+        measurer.setString(candidate);
+
+        // SFML 3: getLocalBounds() trả về sf::FloatRect với hàm .size.x thay cho .width
+        float width = measurer.getLocalBounds().size.x;
+
+        if (width > maxWidth && !currentLine.isEmpty()) {
+            lines.push_back(currentLine);
+            currentLine = w;
+        }
+        else {
+            currentLine = candidate;
+        }
+    }
+    if (!currentLine.isEmpty()) lines.push_back(currentLine);
+    return lines;
+}
+
+// Mở rộng: SỬA LỖI "hướng dẫn chơi bị lệch/tràn khung" — trước đây nội dung
+// HOW TO PLAY (đặc biệt bản tiếng Việt) được viết sẵn với dấu xuống dòng "\n"
+// đặt thủ công theo cảm tính, không tính đúng bề rộng pixel thật của font.
+// Vì tiếng Việt có dấu thường rộng hơn tiếng Anh, nhiều dòng bị vượt quá bề
+// rộng khung (đặc biệt 2 khung TIME ATTACK / SURVIVAL bên phải), khiến chữ
+// tràn ra ngoài viền khung. Hàm này giữ nguyên các dấu xuống dòng CHỦ ĐỘNG có
+// sẵn (ranh giới giữa các gạch đầu dòng) nhưng tự động bẻ thêm dòng cho bất kỳ
+// đoạn nào bị dài hơn maxWidth, đo đúng theo pixel thật của font đang dùng,
+// nên chữ luôn nằm gọn trong khung dù nội dung/ngôn ngữ dài ngắn khác nhau.
+static sf::String wrapHowtoBody(const sf::Font& font, const sf::String& body,
+                                 unsigned int charSize, float maxWidth) {
+    std::vector<sf::String> paragraphs;
+    sf::String cur;
+    for (std::size_t i = 0; i < body.getSize(); i++) {
+        char32_t ch = body[i];
+        if (ch == static_cast<std::uint32_t>('\n')) {
+            paragraphs.push_back(cur);
+            cur.clear();
+        } else {
+            cur += ch;
+        }
+    }
+    paragraphs.push_back(cur);
+
+    sf::String result;
+    bool first = true;
+    for (auto& p : paragraphs) {
+        // Đoạn rỗng (dòng trống chủ động) vẫn giữ nguyên làm 1 dòng trống.
+        std::vector<sf::String> wrapped = p.isEmpty()
+            ? std::vector<sf::String>{ sf::String() }
+            : wrapWordsToWidth(font, p, charSize, maxWidth, /*bold=*/false);
+        for (auto& ln : wrapped) {
+            if (!first) result += sf::String("\n");
+            result += ln;
+            first = false;
+        }
+    }
+    return result;
+}
