@@ -790,108 +790,109 @@ if (appIcon.loadFromFile("assets/icon.png")) {
         p.y = GRID_ORIGIN_Y + (GRID_SIZE * CELL) / 2.f - stackIndex * 34.f;
         scorePopups.push_back(p);
     };
-    // ---------- Mở rộng: "Robot mỏ hỗn" - chửi người chơi theo thời gian thực ----------
-    sf::Texture robotTexture;
-    bool robotTextureLoaded = robotTexture.loadFromFile("assets/robot.png");
-    RoastManager roastManager;
-    roastManager.setLanguage(false); // Mặc định khởi tạo theo Language::ENGLISH
-    // Đo "thời gian suy nghĩ" giữa 2 lần đặt khối liên tiếp, để phát hiện tình huống
-    // nghĩ rất lâu (AFK/cân nhắc kỹ) nhưng vẫn ra 1 nước đi tệ.
-    sf::Clock thinkClock;
-    float pendingThinkTime = 0.f;
+     // ---------- trạng thái kéo-thả (Module 2) ----------
+    bool dragging = false;
+    int dragIndex = -1;
+    sf::Vector2f dragPos;
+    int hoverRow = -1, hoverCol = -1;
+    bool hoverValid = false;
 
-    // ---------- Âm thanh (SFX tổng hợp bằng sóng sine + nhạc nền), mở rộng từ bản MoreShapes ----------
-    SoundManager soundManager;
-    bool musicMuted = false;
-    bool sfxMuted = false; // Mở rộng: bật/tắt riêng SFX (đặt/xóa khối...) qua bảng Settings
-    soundManager.startMusic(); // phát nhạc nền ngay từ màn hình đầu tiên, tự lặp xuyên suốt game
+    // Mở rộng (từ bản MoreShapes): các ô thuộc hàng/cột SẼ bị xóa nếu thả khối
+    // ngay tại vị trí đang hover - dùng để vẽ hiệu ứng nhấp nháy cảnh báo bên dưới.
+    std::vector<std::pair<int, int>> previewClearCells;
+    float previewPulseTime = 0.f;
 
-    // Mở rộng: bảng Settings (biểu tượng bánh răng) - bật/tắt Sound & BGM bất cứ lúc nào
-    // ở màn hình Menu hoặc Play, hoạt động như 1 overlay đè lên trên màn hình hiện tại.
-    bool settingsOpen = false;
+    // Mở rộng: thu nhỏ khay khối để vừa với chiều rộng lưới (464px, do lưới nay nằm
+    // giữa 2 panel trái/phải thay vì chiếm hết bề ngang cửa sổ như trước).
+    const float traySlotW = 145.f;
+    const float traySlotH = 130.f;
+    const float trayGap = 8.f;
+    const float trayTotalW = traySlotW * 3.f + trayGap * 2.f;
+    const float trayY = GRID_ORIGIN_Y + GRID_SIZE * CELL + 40.f;
+    const float trayStartX = GRID_ORIGIN_X + (GRID_SIZE * CELL - trayTotalW) / 2.f;
 
-    // ---------- Trạng thái game ----------
-    int grid[GRID_SIZE][GRID_SIZE];
-    resetGrid(grid); // Việc 4 - Module 1
-
-    int score = 0;
-    int streak = 0;
-    int missStreak = 0; // số khối liên tiếp không ăn dòng nào kể từ lần ăn combo gần nhất
-    int totalLinesCleared = 0;
-    int maxCombo = 0;
-    bool gameOver = false;
-
-    // ----- Game Mode và High Score riêng biệt -----
-    GameMode currentMode = GameMode::CLASSIC;
-    int highScoreClassic   = loadHighScore(HIGHSCORE_CLASSIC_FILE);
-    int highScoreTimeAttack= loadHighScore(HIGHSCORE_TIMEATTACK_FILE);
-    int highScoreSurvival  = loadHighScore(HIGHSCORE_SURVIVAL_FILE);
-    // Tham chiếu thuận tiện vào high score của mode hiện tại
-    auto getHighScore = [&]() -> int& {
-        if (currentMode == GameMode::TIME_ATTACK) return highScoreTimeAttack;
-        if (currentMode == GameMode::SURVIVAL)    return highScoreSurvival;
-        return highScoreClassic;
-    };
-    auto getHighScoreFile = [&]() -> const std::string& {
-        if (currentMode == GameMode::TIME_ATTACK) return HIGHSCORE_TIMEATTACK_FILE;
-        if (currentMode == GameMode::SURVIVAL)    return HIGHSCORE_SURVIVAL_FILE;
-        return HIGHSCORE_CLASSIC_FILE;
-    };
-    int highScore = highScoreClassic; // giữ tương thích với code cũ
-
-    // ----- Time Attack -----
-    float timeAttackRemaining = 180.f; // giây
-    const float TIME_ATTACK_INITIAL = 180.f;
-
-    // ----- Classic: đồng hồ đếm thời gian đã chơi (đếm LÊN từ 0, không giới hạn) -----
-    // Reset về 0 mỗi khi bắt đầu ván Classic mới (chọn Classic ở Menu, bấm R, hoặc bấm
-    // nút "Chơi lại" sau Game Over) - xem các nơi restart bên dưới.
-    sf::Clock classicPlayClock;
-
-    // ----- Survival: ô chướng ngại (mã màu -2 trên lưới) -----
-    const int OBSTACLE_COLOR = -2; // giá trị ô chướng ngại trên lưới
-    int totalBlocksPlaced = 0;    // tổng số khối đã đặt (dùng để trigger sinh ô mới mỗi 15 khối)
-    int lastObstacleAt = 0;       // giá trị totalBlocksPlaced khi lần cuối sinh ô chướng ngại
-
-    // Sinh ngẫu nhiên count ô chướng ngại vào các ô trống của lưới
-    auto spawnObstacles = [&](int count) {
-        std::vector<std::pair<int,int>> empty;
-        for (int r = 0; r < GRID_SIZE; r++)
-            for (int c = 0; c < GRID_SIZE; c++)
-                if (grid[r][c] == 0) empty.push_back({r, c});
-        // trộn ngẫu nhiên danh sách ô trống
-        for (int i = (int)empty.size()-1; i > 0; i--) {
-            int j = rand() % (i + 1);
-            std::swap(empty[i], empty[j]);
-        }
-        int toPlace = std::min(count, (int)empty.size());
-        for (int k = 0; k < toPlace; k++)
-            grid[empty[k].first][empty[k].second] = OBSTACLE_COLOR;
+    auto traySlotPos = [&](int i) {
+        return sf::Vector2f(trayStartX + i * (traySlotW + trayGap), trayY);
     };
 
-    // ----- Survival: Pressure System -----
-    // Pressure đại diện cho mức độ nguy hiểm (0-100). Đạt 100 -> Game Over ngay lập tức.
-    int pressure = 0;                 // giá trị Pressure thực (số nguyên, kẹp [0,100])
-    float pressureDisplay = 0.f;      // giá trị hiển thị, nội suy mượt về "pressure" mỗi khung hình
-    float pressureShakeTimer = 0.f;   // đếm ngược hiệu ứng rung màn hình / phủ đỏ khi Overload
-    bool pressureGameOver = false;    // true nếu Game Over là do Pressure đạt 100 (không phải hết chỗ đặt)
+    for (int i = 0; i < 3; i++) tray[i].basePos = traySlotPos(i);
 
-    // Cấp độ Pressure: 1 (0-25) SAFE, 2 (26-50) WARNING, 3 (51-75) DANGER, 4 (76-99) CRITICAL
-    auto pressureLevel = [](int p) -> int {
-        if (p <= 25) return 1;
-        if (p <= 50) return 2;
-        if (p <= 75) return 3;
-        return 4;
-    };
+    sf::Text title(font, "BLOCK BLAST", 46);
+    title.setFillColor(sf::Color::White);
 
-    // Đếm số Rock Block đang tồn tại trên bàn cờ
-    auto countRocks = [&]() -> int {
-        int n = 0;
-        for (int r = 0; r < GRID_SIZE; r++)
-            for (int c = 0; c < GRID_SIZE; c++)
-                if (grid[r][c] == OBSTACLE_COLOR) n++;
-        return n;
+    sf::Text hudText(font, "", 24);
+    hudText.setFillColor(sf::Color::White);
+
+    sf::Text howtoTitleText(font, "", 30);
+    howtoTitleText.setFillColor(sf::Color::White);
+    howtoTitleText.setPosition(sf::Vector2f(60, 40));
+
+    sf::Text howtoHintText(font, "", 18);
+    howtoHintText.setFillColor(sf::Color(189, 195, 199));
+
+    // Mở rộng: màn hình Hướng dẫn dạng 2 cột - cột trái là "CƠ BẢN" + "ĐỘ KHÓ",
+    // cột phải là 2 khung màu "ĐẤU THỜI GIAN" (xanh dương) và "SINH TỒN" (xanh lá).
+    sf::Text howtoBasicTitleText(font, "", 20);
+    howtoBasicTitleText.setFillColor(sf::Color(255, 110, 110));
+    howtoBasicTitleText.setStyle(sf::Text::Bold);
+    sf::Text howtoBasicBodyText(font, "", 13);
+    howtoBasicBodyText.setFillColor(sf::Color::White);
+    howtoBasicBodyText.setLineSpacing(1.45f);
+
+    sf::Text howtoDifficultyTitleText(font, "", 20);
+    howtoDifficultyTitleText.setFillColor(sf::Color(255, 205, 80));
+    howtoDifficultyTitleText.setStyle(sf::Text::Bold);
+    sf::Text howtoDifficultyIntroText(font, "", 15);
+    howtoDifficultyIntroText.setFillColor(sf::Color::White);
+    // Mở rộng: 3 cột của bảng độ khó (khoảng điểm / tên mức / mô tả) được vẽ
+    // bằng các sf::Text riêng đặt ở tọa độ x CỐ ĐỊNH cho từng cột, để luôn
+    // thẳng hàng thật sự - không phụ thuộc vào việc font có phải monospace
+    // hay không (khác với cách canh bằng dấu cách trong 1 chuỗi trước đây).
+    std::array<sf::Text, 7> howtoDiffRangeText = {
+        sf::Text(font, "", 15), sf::Text(font, "", 15), sf::Text(font, "", 15),
+        sf::Text(font, "", 15), sf::Text(font, "", 15), sf::Text(font, "", 15),
+        sf::Text(font, "", 15)
     };
+    std::array<sf::Text, 7> howtoDiffNameText = {
+        sf::Text(font, "", 15), sf::Text(font, "", 15), sf::Text(font, "", 15),
+        sf::Text(font, "", 15), sf::Text(font, "", 15), sf::Text(font, "", 15),
+        sf::Text(font, "", 15)
+    };
+    std::array<sf::Text, 7> howtoDiffDescText = {
+        sf::Text(font, "", 15), sf::Text(font, "", 15), sf::Text(font, "", 15),
+        sf::Text(font, "", 15), sf::Text(font, "", 15), sf::Text(font, "", 15),
+        sf::Text(font, "", 15)
+    };
+    for (auto& t : howtoDiffRangeText) t.setFillColor(sf::Color(210, 220, 235));
+    for (auto& t : howtoDiffNameText)  { t.setFillColor(sf::Color::White); t.setStyle(sf::Text::Bold); }
+    for (auto& t : howtoDiffDescText)  t.setFillColor(sf::Color(160, 200, 255));
+
+    sf::Text howtoTaTitleText(font, "", 20);
+    howtoTaTitleText.setFillColor(sf::Color(120, 200, 255));
+    howtoTaTitleText.setStyle(sf::Text::Bold);
+    sf::Text howtoTaBodyText(font, "", 13);
+    howtoTaBodyText.setFillColor(sf::Color::White);
+    howtoTaBodyText.setLineSpacing(1.45f);
+
+    sf::Text howtoSurvTitleText(font, "", 20);
+    howtoSurvTitleText.setFillColor(sf::Color(140, 230, 150));
+    howtoSurvTitleText.setStyle(sf::Text::Bold);
+    sf::Text howtoSurvBodyText(font, "", 13);
+    howtoSurvBodyText.setFillColor(sf::Color::White);
+    howtoSurvBodyText.setLineSpacing(1.45f);
+
+    sf::Text hsText(font, "", 20);
+    hsText.setFillColor(sf::Color(241, 196, 15));
+
+    sf::Text overText(font, "", 48);
+    overText.setFillColor(sf::Color(231, 76, 60));
+
+    sf::Text finalScoreText(font, "", 24);
+    finalScoreText.setFillColor(sf::Color::White);
+
+    sf::Text retryText(font, "", 20);
+    retryText.setFillColor(sf::Color(189, 195, 199));
+
 // ===================== NỘI DUNG MÀN HÌNH DISCLAIMER =====================
     // Disclaimer đổi theo ngôn ngữ đã chọn ở màn hình trước:
     //   - Tiếng Việt -> chữ có dấu (U8()).
@@ -1302,3 +1303,202 @@ if (appIcon.loadFromFile("assets/icon.png")) {
                     screen = Screen::MENU;
                 }
             }
+           // ---------------- MÀN HÌNH CHƠI GAME ----------------
+            else if (screen == Screen::PLAY) {
+                if (gameOver) {
+                    if (const auto* kp = event->getIf<sf::Event::KeyPressed>()) {
+                        if (kp->code == sf::Keyboard::Key::R) {
+                            resetGrid(grid);
+                            score = 0; streak = 0; missStreak = 0; totalLinesCleared = 0; maxCombo = 0;
+                            lastDifficultyLevel = 0;
+                            totalBlocksPlaced = 0; lastObstacleAt = 0;
+                            pressure = 0; pressureDisplay = 0.f; pressureGameOver = false; pressureShakeTimer = 0.f;
+                            timeAttackRemaining = TIME_ATTACK_INITIAL;
+                            thinkClock.restart();
+                            classicPlayClock.restart();
+                            if (currentMode == GameMode::SURVIVAL) spawnObstacles(2);
+                            refillTray();
+                            gameOver = false;
+                        }
+                        if (kp->code == sf::Keyboard::Key::Escape) {
+                            screen = Screen::MENU;
+                        }
+                    }
+                    // Mở rộng: 2 nút bấm "Trang chủ" / "Chơi lại" trên màn hình Game Over,
+                    // làm y hệt phím tắt ESC / R ở trên nhưng bằng chuột.
+                    if (const auto* mp = event->getIf<sf::Event::MouseButtonPressed>()) {
+                        if (mp->button == sf::Mouse::Button::Left) {
+                            sf::Vector2f m = toGameCoords(window, mp->position);
+                            if (homeBtn.contains(m)) {
+                                screen = Screen::MENU;
+                            } else if (replayBtn.contains(m)) {
+                                resetGrid(grid);
+                                score = 0; streak = 0; missStreak = 0; totalLinesCleared = 0; maxCombo = 0;
+                                lastDifficultyLevel = 0;
+                                totalBlocksPlaced = 0; lastObstacleAt = 0;
+                            pressure = 0; pressureDisplay = 0.f; pressureGameOver = false; pressureShakeTimer = 0.f;
+                                timeAttackRemaining = TIME_ATTACK_INITIAL;
+                                thinkClock.restart();
+                                classicPlayClock.restart();
+                                if (currentMode == GameMode::SURVIVAL) spawnObstacles(2);
+                                refillTray();
+                                gameOver = false;
+                            }
+                        }
+                    }
+                    continue;
+                }
+
+                // Module 2 - Việc: nhận lựa chọn khối bằng chuột + bắt đầu kéo
+                if (const auto* mp = event->getIf<sf::Event::MouseButtonPressed>()) {
+                    if (mp->button == sf::Mouse::Button::Left) {
+                        sf::Vector2f m = toGameCoords(window, mp->position);
+                        for (int i = 0; i < 3; i++) {
+                            if (tray[i].used) continue;
+                            sf::FloatRect area(tray[i].basePos, sf::Vector2f(traySlotW, traySlotH));
+                            if (area.contains(m)) {
+                                dragging = true;
+                                dragIndex = i;
+                                dragPos = m;
+                                previewClearCells.clear();
+                                // Mở rộng: ghi lại thời gian đã "suy nghĩ" trước khi bắt đầu kéo khối này
+                                pendingThinkTime = thinkClock.getElapsedTime().asSeconds();
+                                
+                                auto box = blockBoundingBox(tray[dragIndex].block);
+                                int bw = box.second, bh = box.first;
+                                float gx = dragPos.x - GRID_ORIGIN_X - (bw * CELL) / 2.f;
+                                float gy = dragPos.y - GRID_ORIGIN_Y - (bh * CELL) / 2.f;
+                                hoverCol = static_cast<int>(std::round(gx / CELL));
+                                hoverRow = static_cast<int>(std::round(gy / CELL));
+                                hoverValid = canPlaceBlock(grid, tray[dragIndex].block, hoverRow, hoverCol);
+                                
+                                break;
+                            }
+                        }
+                    }
+                }
+
+                if (const auto* mm = event->getIf<sf::Event::MouseMoved>()) {
+                    if (dragging) {
+                        dragPos = toGameCoords(window, mm->position);
+
+                        auto box = blockBoundingBox(tray[dragIndex].block);
+                        int bw = box.second, bh = box.first;
+
+                        float gx = dragPos.x - GRID_ORIGIN_X - (bw * CELL) / 2.f;
+                        float gy = dragPos.y - GRID_ORIGIN_Y - (bh * CELL) / 2.f;
+
+                        hoverCol = static_cast<int>(std::round(gx / CELL));
+                        hoverRow = static_cast<int>(std::round(gy / CELL));
+
+                        hoverValid = canPlaceBlock(grid, tray[dragIndex].block, hoverRow, hoverCol);
+
+                        // Mở rộng (từ bản MoreShapes): mô phỏng thử đặt khối trên 1 bản sao lưới
+                        // để biết trước những hàng/cột nào sẽ đầy và bị xóa, phục vụ hiệu ứng
+                        // nhấp nháy cảnh báo bên dưới. Wildcard đè lên ô đã có khối khác nên
+                        // vẫn mô phỏng đúng bằng cách ghi màu khối lên bản sao lưới.
+                        previewClearCells.clear();
+                        if (hoverValid) {
+                            int temp[GRID_SIZE][GRID_SIZE];
+                            for (int i = 0; i < GRID_SIZE; i++)
+                                for (int j = 0; j < GRID_SIZE; j++)
+                                    temp[i][j] = grid[i][j];
+                            for (auto& cell : tray[dragIndex].block.cells) {
+                                int r = hoverRow + cell.first, c = hoverCol + cell.second;
+                                if (r >= 0 && r < GRID_SIZE && c >= 0 && c < GRID_SIZE)
+                                    temp[r][c] = tray[dragIndex].block.color;
+                            }
+                            ClearResult cr = checkFullLines(temp);
+                            for (int r : cr.rows)
+                                for (int c = 0; c < GRID_SIZE; c++) previewClearCells.push_back({r, c});
+                            for (int c : cr.cols)
+                                for (int r = 0; r < GRID_SIZE; r++) previewClearCells.push_back({r, c});
+                        }
+                    }
+                }
+
+                // Việc 4-5 Module 2: kiểm tra hợp lệ & đặt khối khi thả chuột
+                if (const auto* mr = event->getIf<sf::Event::MouseButtonReleased>()) {
+                    if (mr->button == sf::Mouse::Button::Left && dragging) {
+                        if (hoverValid && canPlaceBlock(grid, tray[dragIndex].block, hoverRow, hoverCol)) {
+                            // Mở rộng: ghi nhận độ lấp lưới TRƯỚC khi đặt, dùng để thưởng "vùng giải
+                            // đố" trung tâm khi người chơi đặt chuẩn lúc lưới đã rất chật (>= 2/3).
+                            int occupiedBefore = 0;
+                            for (int rr = 0; rr < GRID_SIZE; rr++)
+                                for (int cc = 0; cc < GRID_SIZE; cc++)
+                                    if (grid[rr][cc] != 0) occupiedBefore++;
+                            bool wasPuzzleZone = occupiedBefore >= (GRID_SIZE * GRID_SIZE * 2) / 3;
+
+                            // Mở rộng: chụp lại trạng thái lưới TRƯỚC khi đặt, dùng riêng cho
+                            // "robot mỏ hỗn" (Roast.h/.cpp) để so sánh trước/sau nước đi này.
+                            int regionsBeforeMove, largestBeforeMove;
+                            analyzeEmptyRegions(grid, regionsBeforeMove, largestBeforeMove);
+                            std::vector<NearCompleteLine> nearCompleteBeforeMove = findNearCompleteLines(grid);
+                            bool placedSpecialBlock = tray[dragIndex].block.isSpecial;
+
+                            int rocksBeforePlace = 0;
+                            if (currentMode == GameMode::SURVIVAL) {
+                                rocksBeforePlace = countRocks();
+                            }
+
+                            int bonus = 0;
+                            placeBlock(grid, tray[dragIndex].block, hoverRow, hoverCol, bonus); // Module 2
+                            soundManager.playPlace(); // hiệu ứng âm thanh khi đặt khối (mở rộng từ bản MoreShapes)
+
+                            int cellsPlaced = countCells(tray[dragIndex].block); // Module 1
+
+                            // Thưởng đặt trúng vùng trung tâm 2x2 khi đang trong "chế độ giải đố"
+                            if (wasPuzzleZone) {
+                                int centerHits = 0;
+                                for (auto& cellOff : tray[dragIndex].block.cells) {
+                                    int r = hoverRow + cellOff.first;
+                                    int c = hoverCol + cellOff.second;
+                                    if (r >= 3 && r <= 4 && c >= 3 && c <= 4) centerHits++;
+                                }
+                                if (centerHits > 0) {
+                                    int centerBonus = centerHits * 25;
+                                    score += centerBonus;
+                                    sf::String centerLabel = selectedLanguage == Language::VIETNAMESE
+                                        ? U8("Trúng tâm giải đố!") : sf::String("Puzzle center!");
+                                    spawnBonusPopup(centerBonus, centerLabel, true);
+                                }
+                            }
+
+                            // Module 3: kiểm tra & xóa hàng/cột đầy
+                            ClearResult cr = checkFullLines(grid);
+                            int linesCleared = static_cast<int>(cr.rows.size() + cr.cols.size());
+
+                            // Survival: đếm số Rock Block SẼ bị phá bởi lượt này TRƯỚC khi
+                            // clearLines() xóa mất dữ liệu (dùng cho Pressure System bên dưới).
+                            int rocksDestroyedThisMove = 0;
+                            if (currentMode == GameMode::SURVIVAL) {
+                                rocksDestroyedThisMove = rocksBeforePlace - countRocks();
+                                if (linesCleared > 0) {
+                                    bool destroyedMark[GRID_SIZE][GRID_SIZE] = {};
+                                    for (int r : cr.rows)
+                                        for (int c = 0; c < GRID_SIZE; c++)
+                                            if (grid[r][c] == OBSTACLE_COLOR) destroyedMark[r][c] = true;
+                                    for (int c : cr.cols)
+                                        for (int r = 0; r < GRID_SIZE; r++)
+                                            if (grid[r][c] == OBSTACLE_COLOR) destroyedMark[r][c] = true;
+                                    for (int i = 0; i < GRID_SIZE; i++)
+                                        for (int j = 0; j < GRID_SIZE; j++)
+                                            if (destroyedMark[i][j]) rocksDestroyedThisMove++;
+                                }
+                            }
+
+                            clearLines(grid, cr);
+                            totalLinesCleared += linesCleared;
+
+                            // Yêu cầu: khối NỔ (Bom/Đại Bác) không tính vào "khối cho phép bỏ lỡ"
+                            // dù lượt đặt đó có ăn được hàng/cột hay không.
+                            bool placedExplosiveBlock = tray[dragIndex].block.isSpecial
+                                && (tray[dragIndex].block.id == BOMB_ID || tray[dragIndex].block.id == SUPERBOMB_ID);
+                            int gained = computeScoreForMove(cellsPlaced, linesCleared, streak, missStreak,
+                                                              placedExplosiveBlock);
+                            score += gained + bonus;
+                            maxCombo = std::max(maxCombo, streak);
+
+                            if (linesCleared > 0) {
+                                spawnScorePopup(gained + bonus, linesCleared, streak);
+                                soundManager.playClear(linesCleared, streak);
