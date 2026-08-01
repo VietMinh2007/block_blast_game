@@ -1502,3 +1502,91 @@ if (appIcon.loadFromFile("assets/icon.png")) {
                             if (linesCleared > 0) {
                                 spawnScorePopup(gained + bonus, linesCleared, streak);
                                 soundManager.playClear(linesCleared, streak);
+
+                                // ----- Time Attack: cộng thêm thời gian khi xóa hàng/cột -----
+                                if (currentMode == GameMode::TIME_ATTACK) {
+                                    float bonus_time = 0.f;
+                                    if      (linesCleared >= 4) bonus_time = 5.f;
+                                    else if (linesCleared == 3) bonus_time = 3.f;
+                                    else if (linesCleared == 2) bonus_time = 2.f;
+                                    else                         bonus_time = 1.f;
+                                    timeAttackRemaining += bonus_time;
+                                    // Hiện popup thông báo +giây
+                                    sf::String timeLabel = sf::String("+") + sf::String(std::to_string((int)bonus_time))
+                                        + (selectedLanguage == Language::VIETNAMESE ? U8("s") : sf::String("s"));
+                                    spawnBonusPopup(0, timeLabel, false);
+                                }
+                            }
+
+                            // Mở rộng: thưởng "dọn sạch lưới" (All Clear)
+                            if (linesCleared > 0 && isGridEmpty(grid)) {
+                                int clearBonus = fullClearBonus(score);
+                                score += clearBonus;
+                                sf::String clearLabel = selectedLanguage == Language::VIETNAMESE
+                                    ? U8("Dọn sạch lưới!") : sf::String("ALL CLEAR!");
+                                spawnBonusPopup(clearBonus, clearLabel, true);
+                                soundManager.playFullClear(); // âm thanh riêng khi ăn sạch toàn bộ lưới
+                            }
+
+                            // ----- Survival: cập nhật Pressure System -----
+                            if (currentMode == GameMode::SURVIVAL) {
+                                // Pressure tăng khi đặt Block (+2), giảm khi Clear hàng/cột (-4/hàng-cột,
+                                // thêm -5 nếu ăn từ 2 hàng/cột trở lên cùng lượt) và khi phá Rock Block (-6/viên).
+                                int delta = 2;
+                                if (linesCleared > 0) {
+                                    delta -= 4 * linesCleared;
+                                    if (linesCleared >= 2) delta -= 5; // Multi Clear Bonus
+                                }
+                                delta -= 6 * rocksDestroyedThisMove;
+
+                                if (addPressure(delta)) {
+                                    gameOver = true;
+                                    pressureGameOver = true;
+                                    pressureShakeTimer = 0.5f;
+                                    soundManager.playGameOver();
+                                    if (score > getHighScore()) {
+                                        getHighScore() = score;
+                                        highScore = score;
+                                        saveHighScore(getHighScoreFile(), score);
+                                    }
+                                    updateLeaderboard(LEADERBOARD_FILE, "Player", score);
+                                }
+                            }
+
+                            // ----- Survival: đếm khối đã đặt và sinh Rock Block mới theo chu kỳ -----
+                            if (currentMode == GameMode::SURVIVAL && !gameOver) {
+                                totalBlocksPlaced++;
+                                if (totalBlocksPlaced - lastObstacleAt >= 15) {
+                                    lastObstacleAt = totalBlocksPlaced;
+                                    // Số Rock Block sinh ra = spawn cơ bản theo Pressure Level hiện tại
+                                    // + đá cộng thêm theo số Rock Block đang tồn tại (TRƯỚC đợt spawn này).
+                                    int existingBefore = countRocks();
+                                    int spawnCount = computeRockSpawnCount(existingBefore);
+                                    spawnObstacles(spawnCount);
+
+                                    // Đến chu kỳ Spawn: +5 Pressure. Sau khi Spawn hoàn tất, mỗi Rock Block
+                                    // còn tồn tại trên bàn (đếm trước đợt spawn này): +1 Pressure mỗi viên.
+                                    if (addPressure(5 + existingBefore)) {
+                                        gameOver = true;
+                                        pressureGameOver = true;
+                                        pressureShakeTimer = 0.5f;
+                                        soundManager.playGameOver();
+                                        if (score > getHighScore()) {
+                                            getHighScore() = score;
+                                            highScore = score;
+                                            saveHighScore(getHighScoreFile(), score);
+                                        }
+                                        updateLeaderboard(LEADERBOARD_FILE, "Player", score);
+                                    }
+                                }
+                            }
+
+                            // Mở rộng: thông báo lên mốc độ khó mới
+                            int newDifficultyLevel = difficultyLevel(score);
+                            if (newDifficultyLevel > lastDifficultyLevel) {
+                                lastDifficultyLevel = newDifficultyLevel;
+                                sf::String lvlLabel = selectedLanguage == Language::VIETNAMESE
+                                    ? U8("Tăng độ khó! Cấp ") + sf::String(std::to_string(newDifficultyLevel))
+                                    : sf::String("Difficulty up! Lv ") + sf::String(std::to_string(newDifficultyLevel));
+                                spawnBonusPopup(0, lvlLabel, false);
+                            }
