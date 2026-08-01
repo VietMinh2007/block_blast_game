@@ -1502,3 +1502,178 @@ if (appIcon.loadFromFile("assets/icon.png")) {
                             if (linesCleared > 0) {
                                 spawnScorePopup(gained + bonus, linesCleared, streak);
                                 soundManager.playClear(linesCleared, streak);
+
+                                // ----- Time Attack: cộng thêm thời gian khi xóa hàng/cột -----
+                                if (currentMode == GameMode::TIME_ATTACK) {
+                                    float bonus_time = 0.f;
+                                    if      (linesCleared >= 4) bonus_time = 5.f;
+                                    else if (linesCleared == 3) bonus_time = 3.f;
+                                    else if (linesCleared == 2) bonus_time = 2.f;
+                                    else                         bonus_time = 1.f;
+                                    timeAttackRemaining += bonus_time;
+                                    // Hiện popup thông báo +giây
+                                    sf::String timeLabel = sf::String("+") + sf::String(std::to_string((int)bonus_time))
+                                        + (selectedLanguage == Language::VIETNAMESE ? U8("s") : sf::String("s"));
+                                    spawnBonusPopup(0, timeLabel, false);
+                                }
+                            }
+
+                            // Mở rộng: thưởng "dọn sạch lưới" (All Clear)
+                            if (linesCleared > 0 && isGridEmpty(grid)) {
+                                int clearBonus = fullClearBonus(score);
+                                score += clearBonus;
+                                sf::String clearLabel = selectedLanguage == Language::VIETNAMESE
+                                    ? U8("Dọn sạch lưới!") : sf::String("ALL CLEAR!");
+                                spawnBonusPopup(clearBonus, clearLabel, true);
+                                soundManager.playFullClear(); // âm thanh riêng khi ăn sạch toàn bộ lưới
+                            }
+
+                            // ----- Survival: cập nhật Pressure System -----
+                            if (currentMode == GameMode::SURVIVAL) {
+                                // Pressure tăng khi đặt Block (+2), giảm khi Clear hàng/cột (-4/hàng-cột,
+                                // thêm -5 nếu ăn từ 2 hàng/cột trở lên cùng lượt) và khi phá Rock Block (-6/viên).
+                                int delta = 2;
+                                if (linesCleared > 0) {
+                                    delta -= 4 * linesCleared;
+                                    if (linesCleared >= 2) delta -= 5; // Multi Clear Bonus
+                                }
+                                delta -= 6 * rocksDestroyedThisMove;
+
+                                if (addPressure(delta)) {
+                                    gameOver = true;
+                                    pressureGameOver = true;
+                                    pressureShakeTimer = 0.5f;
+                                    soundManager.playGameOver();
+                                    if (score > getHighScore()) {
+                                        getHighScore() = score;
+                                        highScore = score;
+                                        saveHighScore(getHighScoreFile(), score);
+                                    }
+                                    updateLeaderboard(LEADERBOARD_FILE, "Player", score);
+                                }
+                            }
+
+                            // ----- Survival: đếm khối đã đặt và sinh Rock Block mới theo chu kỳ -----
+                            if (currentMode == GameMode::SURVIVAL && !gameOver) {
+                                totalBlocksPlaced++;
+                                if (totalBlocksPlaced - lastObstacleAt >= 15) {
+                                    lastObstacleAt = totalBlocksPlaced;
+                                    // Số Rock Block sinh ra = spawn cơ bản theo Pressure Level hiện tại
+                                    // + đá cộng thêm theo số Rock Block đang tồn tại (TRƯỚC đợt spawn này).
+                                    int existingBefore = countRocks();
+                                    int spawnCount = computeRockSpawnCount(existingBefore);
+                                    spawnObstacles(spawnCount);
+
+                                    // Đến chu kỳ Spawn: +5 Pressure. Sau khi Spawn hoàn tất, mỗi Rock Block
+                                    // còn tồn tại trên bàn (đếm trước đợt spawn này): +1 Pressure mỗi viên.
+                                    if (addPressure(5 + existingBefore)) {
+                                        gameOver = true;
+                                        pressureGameOver = true;
+                                        pressureShakeTimer = 0.5f;
+                                        soundManager.playGameOver();
+                                        if (score > getHighScore()) {
+                                            getHighScore() = score;
+                                            highScore = score;
+                                            saveHighScore(getHighScoreFile(), score);
+                                        }
+                                        updateLeaderboard(LEADERBOARD_FILE, "Player", score);
+                                    }
+                                }
+                            }
+
+                            // Mở rộng: thông báo lên mốc độ khó mới
+                            int newDifficultyLevel = difficultyLevel(score);
+                            if (newDifficultyLevel > lastDifficultyLevel) {
+                                lastDifficultyLevel = newDifficultyLevel;
+                                sf::String lvlLabel = selectedLanguage == Language::VIETNAMESE
+                                    ? U8("Tăng độ khó! Cấp ") + sf::String(std::to_string(newDifficultyLevel))
+                                    : sf::String("Difficulty up! Lv ") + sf::String(std::to_string(newDifficultyLevel));
+                                spawnBonusPopup(0, lvlLabel, false);
+                            }
+
+// ---------- Mở rộng: "Robot mỏ hỗn" - phát hiện nước đi tệ ----------
+                            // 1) Đặt khối làm vỡ vụn / bóp nghẹt không gian trống đang có, mà
+                            //    không ăn được hàng/cột nào để bù lại - "đi vào lòng đất".
+                            if (!placedSpecialBlock && linesCleared == 0 && cellsPlaced >= 4) {
+                                int regionsAfterMove, largestAfterMove;
+                                analyzeEmptyRegions(grid, regionsAfterMove, largestAfterMove);
+                                bool fragmentedBadly =
+                                    (regionsAfterMove > regionsBeforeMove) ||
+                                    (largestBeforeMove > 0 && largestAfterMove < largestBeforeMove * 0.6);
+                                if (fragmentedBadly) {
+                                    bool wasLongThink = pendingThinkTime > 10.f;
+                                    roastManager.tryTrigger(wasLongThink ? RoastTrigger::AfkBadMove
+                                                                          : RoastTrigger::BadPlacement);
+                                }
+                            }
+                            // 2) Có hàng/cột đã gần đầy (chỉ còn 1 ô trống) từ TRƯỚC lượt này,
+                            //    nhưng lượt đặt vừa rồi lại không ăn được hàng/cột đó.
+                            if (!nearCompleteBeforeMove.empty()) {
+                                bool missedSomeLine = false;
+                                for (auto& line : nearCompleteBeforeMove) {
+                                    bool wasCleared = false;
+                                    if (line.isRow) {
+                                        for (int rr : cr.rows) if (rr == line.index) { wasCleared = true; break; }
+                                    } else {
+                                        for (int cc : cr.cols) if (cc == line.index) { wasCleared = true; break; }
+                                    }
+                                    if (!wasCleared) { missedSomeLine = true; break; }
+                                }
+                                if (missedSomeLine) {
+                                    roastManager.tryTrigger(RoastTrigger::MissedClear);
+                                }
+                            }
+
+                            tray[dragIndex].used = true;
+
+                            // Module 4: khi khay hết thì sinh khối mới
+                            bool allUsed = tray[0].used && tray[1].used && tray[2].used;
+                            if (allUsed) refillTray();
+
+                            // Module 4 - Việc 3: kiểm tra thua
+                            std::array<Block,3> curBlocks = {tray[0].block, tray[1].block, tray[2].block};
+                            std::array<bool,3> curUsed = {tray[0].used, tray[1].used, tray[2].used};
+if (!gameOver && isGameOver(grid, curBlocks, curUsed)) {
+                                gameOver = true;
+                                soundManager.playGameOver();
+                                // Cập nhật high score riêng của mode đang chơi
+                                if (score > getHighScore()) {
+                                    getHighScore() = score;
+                                    highScore = score;
+                                    saveHighScore(getHighScoreFile(), score);
+                                }
+                                updateLeaderboard(LEADERBOARD_FILE, "Player", score);
+                                const int LOW_SCORE_ROAST_THRESHOLD = 1500;
+                                if (score < LOW_SCORE_ROAST_THRESHOLD) {
+                                    roastManager.tryTrigger(RoastTrigger::GameOverLowScore);
+                                }
+                            }
+                        } else {
+                            // Thả khối vào vị trí không hợp lệ -> tiếng "bíp" báo sai chỗ (mở rộng từ bản MoreShapes)
+                            soundManager.playInvalid();
+                        }
+                        dragging = false;
+                        dragIndex = -1;
+                        hoverRow = hoverCol = -1;
+                        previewClearCells.clear();
+                        thinkClock.restart(); // mở rộng: bắt đầu đo lại "thời gian nghĩ" cho lượt tiếp theo
+                    }
+                }
+
+                if (const auto* kp = event->getIf<sf::Event::KeyPressed>()) {
+                    // Phím H: gợi ý (Hint System - Module 2 mở rộng)
+                    if (kp->code == sf::Keyboard::Key::H) {
+                        for (int i = 0; i < 3; i++) {
+                            if (tray[i].used) continue;
+                            int hr, hc;
+                            if (giveHint(grid, tray[i].block, hr, hc)) {
+                                std::cout << "Goi y: dat khoi " << i << " tai (" << hr << "," << hc << ")\n";
+                            }
+                        }
+                    }
+                    if (kp->code == sf::Keyboard::Key::Escape) {
+                        screen = Screen::MENU;
+                    }
+                }
+            }
+}
