@@ -1154,3 +1154,151 @@ if (appIcon.loadFromFile("assets/icon.png")) {
                     soundManager.setMusicVolume(musicMuted ? 0.f : 32.f);
                 }
             }
+// ---------------- MÀN HÌNH SPLASH (logo lúc mở game) ----------------
+            // Bấm chuột hoặc phím bất kỳ đều bỏ qua splash ngay lập tức, giống
+            // hành vi "tap to skip" của các splash screen game mobile.
+            if (screen == Screen::SPLASH) {
+                if (event->is<sf::Event::MouseButtonPressed>() || event->is<sf::Event::KeyPressed>()) {
+                    screen = Screen::LANGUAGE;
+                }
+                continue;
+            }
+
+            // ---------------- BẢNG SETTINGS (overlay) ----------------
+            // Mở rộng: khi bảng Settings đang mở, xử lý riêng các nút bấm của nó (đóng bảng,
+            // công tắc Sound, công tắc BGM) rồi bỏ qua (continue), KHÔNG cho sự kiện này lan
+            // xuống xử lý bình thường của màn hình bên dưới.
+            if (settingsOpen) {
+                if (const auto* mp = event->getIf<sf::Event::MouseButtonPressed>()) {
+                    if (mp->button == sf::Mouse::Button::Left) {
+                        sf::Vector2f m = toGameCoords(window, mp->position);
+                        if (settingsCloseBtn.contains(m)) {
+                            settingsOpen = false;
+                        } else if (soundSwitchBtn.contains(m)) {
+                            sfxMuted = !sfxMuted;
+                            soundManager.setSfxVolume(sfxMuted ? 0.f : 75.f);
+                        } else if (musicSwitchBtn.contains(m)) {
+                            musicMuted = !musicMuted;
+                            soundManager.setMusicVolume(musicMuted ? 0.f : 32.f);
+                        } else if (settingsHomeBtn.contains(m)) {
+                            // Về trang chủ: đóng Settings và quay lại Menu (không reset điểm,
+                            // giống hệt nút Home ở màn Game Over - lượt chơi mới sẽ reset khi bấm Start).
+                            settingsOpen = false;
+                            screen = Screen::MENU;
+                        } else if (settingsReplayBtn.contains(m)) {
+                            // Chơi lại: reset toàn bộ ván hiện tại và bắt đầu chơi ngay
+                            settingsOpen = false;
+                            resetGrid(grid);
+                            score = 0; streak = 0; missStreak = 0; totalLinesCleared = 0; maxCombo = 0;
+                            lastDifficultyLevel = 0;
+                            totalBlocksPlaced = 0; lastObstacleAt = 0;
+                            pressure = 0; pressureDisplay = 0.f; pressureGameOver = false; pressureShakeTimer = 0.f;
+                            timeAttackRemaining = TIME_ATTACK_INITIAL;
+                            thinkClock.restart();
+                            if (currentMode == GameMode::SURVIVAL) spawnObstacles(2);
+                            refillTray();
+                            gameOver = false;
+                            screen = Screen::PLAY;
+                        }
+                    }
+                }
+                if (const auto* kp = event->getIf<sf::Event::KeyPressed>()) {
+                    if (kp->code == sf::Keyboard::Key::Escape) settingsOpen = false;
+                }
+                continue;
+            }
+
+            // Bấm vào biểu tượng bánh răng (góc trên-phải) để mở bảng Settings - hoạt động ở
+            // Menu và trong lúc chơi (ẩn/đóng khi đang ở màn hình Game Over, vì màn đó đã có
+            // sẵn 2 nút Trang chủ/Chơi lại riêng).
+            if (screen == Screen::MENU || (screen == Screen::PLAY && !gameOver)) {
+                if (const auto* mp = event->getIf<sf::Event::MouseButtonPressed>()) {
+                    if (mp->button == sf::Mouse::Button::Left) {
+                        sf::Vector2f m = toGameCoords(window, mp->position);
+                        if (gearBtn.contains(m)) {
+                            settingsOpen = true;
+                            continue;
+                        }
+                    }
+                }
+            }
+
+            // ---------------- MÀN HÌNH DISCLAIMER ----------------
+            if (screen == Screen::DISCLAIMER) {
+                if (const auto* mp = event->getIf<sf::Event::MouseButtonPressed>()) {
+                    if (mp->button == sf::Mouse::Button::Left) {
+                        sf::Vector2f m = toGameCoords(window, mp->position);
+                        if (agreeBtn.getGlobalBounds().contains(m)) {
+                            screen = Screen::MENU;
+                        } else if (disagreeBtn.getGlobalBounds().contains(m)) {
+                            window.close();
+                        }
+                    }
+                }
+            }
+            // ---------------- MÀN HÌNH CHỌN NGÔN NGỮ ----------------
+            else if (screen == Screen::LANGUAGE) {
+                if (const auto* mp = event->getIf<sf::Event::MouseButtonPressed>()) {
+                    if (mp->button == sf::Mouse::Button::Left) {
+                        sf::Vector2f m = toGameCoords(window, mp->position);
+                        if (englishRow.contains(m)) {
+                            selectedLanguage = Language::ENGLISH;
+                            roastManager.setLanguage(false);
+                        } else if (vietnameseRow.contains(m)) {
+                            selectedLanguage = Language::VIETNAMESE;
+                            roastManager.setLanguage(true);
+                        } else if (langOkBtn.contains(m)) {
+                            rebuildDisclaimerLayout(selectedLanguage);
+                            screen = Screen::DISCLAIMER;
+                        }
+                    }
+                }
+            }
+            // ---------------- MÀN HÌNH MENU ----------------
+            else if (screen == Screen::MENU) {
+                if (const auto* mp = event->getIf<sf::Event::MouseButtonPressed>()) {
+                    sf::Vector2f m = toGameCoords(window, mp->position);
+                    const float btnW = 340, btnH = 60, btnGap = 80; // Mở rộng nút từ 240 lên 340 để chứa đủ chữ
+                    const float btnX = WINDOW_W / 2.f - btnW / 2.f;
+                    sf::FloatRect classicBtn  (sf::Vector2f(btnX, 300),            sf::Vector2f(btnW, btnH));
+                    sf::FloatRect taBtn       (sf::Vector2f(btnX, 300 + btnGap),   sf::Vector2f(btnW, btnH));
+                    sf::FloatRect survivalBtn (sf::Vector2f(btnX, 300 + btnGap*2), sf::Vector2f(btnW, btnH));
+                    sf::FloatRect howtoBtn    (sf::Vector2f(btnX, 300 + btnGap*3), sf::Vector2f(btnW, btnH));
+                    sf::FloatRect quitBtn     (sf::Vector2f(btnX, 300 + btnGap*4), sf::Vector2f(btnW, btnH));
+
+                    auto startGameMode = [&](GameMode mode) {
+                        currentMode = mode;
+                        highScore = getHighScore();
+                        resetGrid(grid);
+                        score = 0; streak = 0; missStreak = 0; totalLinesCleared = 0; maxCombo = 0;
+                        lastDifficultyLevel = 0;
+                        totalBlocksPlaced = 0; lastObstacleAt = 0;
+                            pressure = 0; pressureDisplay = 0.f; pressureGameOver = false; pressureShakeTimer = 0.f;
+                        timeAttackRemaining = TIME_ATTACK_INITIAL;
+                        thinkClock.restart();
+                        classicPlayClock.restart();
+                        if (mode == GameMode::SURVIVAL) spawnObstacles(2);
+                        refillTray();
+                        gameOver = false;
+                        screen = Screen::PLAY;
+                    };
+
+                    if (classicBtn.contains(m)) {
+                        startGameMode(GameMode::CLASSIC);
+                    } else if (taBtn.contains(m)) {
+                        startGameMode(GameMode::TIME_ATTACK);
+                    } else if (survivalBtn.contains(m)) {
+                        startGameMode(GameMode::SURVIVAL);
+                    } else if (howtoBtn.contains(m)) {
+                        screen = Screen::HOWTO;
+                    } else if (quitBtn.contains(m)) {
+                        window.close();
+                    }
+                }
+            }
+            // ---------------- MÀN HÌNH HƯỚNG DẪN ----------------
+            else if (screen == Screen::HOWTO) {
+                if (event->is<sf::Event::MouseButtonPressed>() || event->is<sf::Event::KeyPressed>()) {
+                    screen = Screen::MENU;
+                }
+            }
