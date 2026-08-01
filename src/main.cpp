@@ -682,3 +682,27 @@ if (appIcon.loadFromFile("assets/icon.png")) {
         }
     };
     refillTray();
+    // ===================== HIỆU ỨNG POPUP "+ĐIỂM" BAY LÊN =====================
+    struct ScorePopup {
+        float x, y;
+        float age = 0.f;
+        int amount = 0;
+        bool showAmount = true; // false: chỉ hiện nhãn chữ (vd thông báo lên cấp độ khó)
+        sf::String label; // "" nếu chỉ hiện số điểm, không có nhãn combo
+    };
+    std::vector<ScorePopup> scorePopups;
+    const float POPUP_LIFETIME = 1.1f;
+
+    // Mở rộng: đồng hồ tích lũy dùng để tạo hiệu ứng "nhấp nháy" (pulse) cho điểm/combo
+    // khi lưới đã bị chiếm >= 1/2, giúp người chơi chú ý hơn lúc bàn cờ sắp chật.
+    float uiPulseTime = 0.f;
+
+    // Mở rộng: màu nền hiện đang hiển thị, được nội suy dần (lerp) mỗi khung hình về
+    // phía màu mục tiêu của mốc độ khó hiện tại - để nền đổi màu MƯỢT thay vì giật cục
+    // ngay khi vừa qua ngưỡng điểm.
+    BgGradient currentBg = backgroundForTier(0);
+
+    sf::Clock frameClock;
+
+    enum class Screen { SPLASH, DISCLAIMER, LANGUAGE, MENU, HOWTO, PLAY };
+    Screen screen = Screen::SPLASH;
