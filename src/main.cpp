@@ -706,3 +706,86 @@ if (appIcon.loadFromFile("assets/icon.png")) {
 
     enum class Screen { SPLASH, DISCLAIMER, LANGUAGE, MENU, HOWTO, PLAY };
     Screen screen = Screen::SPLASH;
+// ---------- Màn hình SPLASH (giới thiệu logo lúc mở game) ----------
+    // Mở rộng: hiện logo "BLOCK BLAST" (mẫu Bùng Nổ) ngay khi khởi động, kiểu
+    // splash screen của Garena/Liên Quân Mobile - logo phóng to bung ra kèm
+    // hiệu ứng "nổ" các khối màu, giữ vài giây rồi tự mờ dần chuyển sang màn
+    // chọn ngôn ngữ. Người chơi có thể bấm chuột/phím bất kỳ để bỏ qua ngay.
+    // Mở rộng: dùng đúng artwork "Mẫu 1 - Bùng Nổ" (cụm khối 3D nổ tung + chữ
+    // "BLOCK BLAST" đã được thiết kế sẵn trong assets/splash_logo.png, nền đen
+    // đã được key thành trong suốt) thay vì chỉ dùng icon app + chữ vẽ tay,
+    // để splash giống hệt ảnh mẫu, đúng tinh thần splash Garena/Liên Quân Mobile.
+    sf::Texture splashLogoTexture;
+    bool splashLogoLoaded = splashLogoTexture.loadFromFile("assets/splash_logo.png");
+    sf::Sprite splashLogoSprite(splashLogoTexture);
+    if (splashLogoLoaded) {
+        sf::FloatRect lb = splashLogoSprite.getLocalBounds();
+        splashLogoSprite.setOrigin(sf::Vector2f(lb.position.x + lb.size.x / 2.f,
+                                                  lb.position.y + lb.size.y / 2.f));
+        // Artwork gốc rộng ~675px -> co lại vừa khung splash (~460px chiều ngang)
+        float targetW = 460.f;
+        float s = targetW / std::max(1.f, lb.size.x);
+        splashLogoSprite.setScale(sf::Vector2f(s, s));
+    }
+    sf::Clock splashClock;
+    const float SPLASH_LOGO_BASE_SCALE = splashLogoLoaded
+        ? splashLogoSprite.getScale().x : 1.f;
+    const float SPLASH_TOTAL_DURATION = 2.8f; // tổng thời lượng splash (giây) trước khi tự chuyển màn
+
+    // Các khối màu văng ra khi logo "nổ", lấy màu từ chính bảng màu khối trong game
+    // để đồng bộ cảm giác với gameplay (mẫu 1 - Bùng nổ).
+    struct SplashParticle { float angle, speed, size; sf::Color color; };
+    std::vector<SplashParticle> splashParticles;
+    for (int i = 0; i < 20; i++) {
+        SplashParticle p;
+        p.angle = static_cast<float>(rand() % 360) * 3.14159265f / 180.f;
+        p.speed = 70.f + static_cast<float>(rand() % 110);
+        p.size = 10.f + static_cast<float>(rand() % 16);
+        p.color = RANDOMIZED_PALETTE[rand() % 6];
+        splashParticles.push_back(p);
+    }
+
+    // ---------- Ngôn ngữ giao diện ----------
+    Language selectedLanguage = Language::ENGLISH; // mặc định giống ảnh mẫu
+    UiStrings uiEn = makeEnglishStrings();
+    UiStrings uiVi = makeVietnameseStrings();
+    auto UI = [&]() -> const UiStrings& {
+        return selectedLanguage == Language::ENGLISH ? uiEn : uiVi;
+    };
+
+    // Hàm tạo popup "+điểm" bay lên - đặt SAU khi selectedLanguage đã khai báo
+    // vì cần chọn nhãn combo theo đúng ngôn ngữ đang chọn.
+    auto spawnScorePopup = [&](int amount, int linesCleared, int comboStreak) {
+        sf::String label;
+        if (linesCleared >= 4 || comboStreak >= 4) {
+            label = selectedLanguage == Language::VIETNAMESE ? U8("Tuyệt đỉnh!") : sf::String("Amazing!");
+        } else if (linesCleared == 3) {
+            label = selectedLanguage == Language::VIETNAMESE ? U8("Xuất sắc!") : sf::String("Awesome!");
+        } else if (linesCleared == 2) {
+            label = selectedLanguage == Language::VIETNAMESE ? U8("Tuyệt vời!") : sf::String("Great!");
+        } else if (linesCleared == 1) {
+            label = selectedLanguage == Language::VIETNAMESE ? U8("Tốt lắm!") : sf::String("Nice!");
+        }
+        ScorePopup p;
+        p.amount = amount;
+        p.label = label;
+        // Fix lỗi: các popup sinh ra cùng lúc (vd combo + bonus dọn sạch lưới) trước đây luôn
+        // vẽ đè lên đúng 1 điểm, gây rối mắt. Nay xếp chồng lên nhau theo thứ tự + rung nhẹ trục X.
+        int stackIndex = static_cast<int>(scorePopups.size());
+        p.x = GRID_ORIGIN_X + (GRID_SIZE * CELL) / 2.f + static_cast<float>(rand() % 30 - 15);
+        p.y = GRID_ORIGIN_Y + (GRID_SIZE * CELL) / 2.f - stackIndex * 34.f;
+        scorePopups.push_back(p);
+    };
+
+    // Popup phụ dùng cho các thông báo mở rộng: thưởng dọn sạch lưới (All Clear), lên cấp độ
+    // khó, và thưởng đặt trúng "vùng giải đố" ở trung tâm lưới khi lưới gần đầy.
+    auto spawnBonusPopup = [&](int amount, const sf::String& label, bool showAmount) {
+        ScorePopup p;
+        p.amount = amount;
+        p.label = label;
+        p.showAmount = showAmount;
+        int stackIndex = static_cast<int>(scorePopups.size());
+        p.x = GRID_ORIGIN_X + (GRID_SIZE * CELL) / 2.f + static_cast<float>(rand() % 30 - 15);
+        p.y = GRID_ORIGIN_Y + (GRID_SIZE * CELL) / 2.f - stackIndex * 34.f;
+        scorePopups.push_back(p);
+    };
