@@ -290,3 +290,276 @@ struct TraySlot {
     bool used;
     sf::Vector2f basePos; // vị trí gốc trong khay để vẽ khi không kéo
 };
+
+// ===================== MÀN HÌNH DISCLAIMER =====================
+// Một "từ" có màu riêng, dùng để dựng đoạn văn có phần tô màu giống ảnh
+// mẫu, rồi tự động xuống dòng (word-wrap) theo chiều rộng cửa sổ.
+struct ColoredWord {
+    sf::String text;
+    sf::Color color;
+};
+using Paragraph = std::vector<ColoredWord>;
+
+static void appendWords(Paragraph& p, const std::string& utf8Text, sf::Color color) {
+    std::istringstream iss(utf8Text);
+    std::string token;
+    while (iss >> token) {
+        p.push_back({U8(token), color});
+    }
+}
+
+// Một từ đã được layout sẵn: nội dung + vị trí (x, y) tuyệt đối trên màn hình.
+struct LaidOutWord {
+    sf::String text;
+    sf::Color color;
+    float x, y;
+};
+
+// Word-wrap toàn bộ danh sách đoạn văn thành các từ đã có toạ độ, trả về
+// vị trí Y ngay sau đoạn văn cuối cùng.
+static float layoutParagraphs(const sf::Font& font, const std::vector<Paragraph>& paragraphs,
+                               float originX, float originY, float maxWidth,
+                               unsigned int charSize, float lineHeight, float paragraphGap,
+                               std::vector<LaidOutWord>& out) {
+    float curY = originY;
+    sf::Text measurer(font, "", charSize);
+    measurer.setString(" .");
+    float dotAndSpaceW = measurer.getLocalBounds().size.x;
+    measurer.setString(".");
+    float spaceW = dotAndSpaceW - measurer.getLocalBounds().size.x;
+
+    for (const auto& para : paragraphs) {
+        float curX = originX;
+        for (const auto& w : para) {
+            measurer.setString(w.text);
+            float wWidth = measurer.getLocalBounds().size.x;
+            if (curX > originX && curX + wWidth > originX + maxWidth) {
+                curX = originX;
+                curY += lineHeight;
+            }
+            out.push_back({w.text, w.color, curX, curY});
+            curX += wWidth + spaceW;
+        }
+        curY += lineHeight + paragraphGap;
+    }
+    return curY;
+}
+
+// Lõi dùng chung: bẻ 1 chuỗi sf::String (đã tách sẵn theo khoảng trắng) thành
+// nhiều dòng không vượt quá maxWidth pixel, đo đúng theo style (bold hay
+// không) sẽ dùng để vẽ, để tránh lệch giữa lúc đo và lúc vẽ thật.
+static std::vector<sf::String> wrapWordsToWidth(const sf::Font& font, const sf::String& full,
+                                                 unsigned int charSize, float maxWidth, bool bold) {
+    std::vector<sf::String> words;
+    sf::String word;
+    for (std::size_t i = 0; i < full.getSize(); i++) {
+        char32_t ch = full[i];
+        if (ch == static_cast<std::uint32_t>(' ')) {
+            if (!word.isEmpty()) { words.push_back(word); word.clear(); }
+        } else {
+            word += static_cast<char32_t>(ch);
+        }
+    }
+    if (!word.isEmpty()) words.push_back(word);
+
+    std::vector<sf::String> lines;
+    sf::String currentLine;
+    sf::Text measurer(font, "", charSize);
+    if (bold) measurer.setStyle(sf::Text::Bold);
+    for (auto& w : words) {
+        sf::String candidate = currentLine.isEmpty() ? w : (currentLine + sf::String(" ") + w);
+        measurer.setString(candidate);
+        float width = measurer.getLocalBounds().size.x;
+        if (width > maxWidth && !currentLine.isEmpty()) {
+            lines.push_back(currentLine);
+            currentLine = w;
+        } else {
+            currentLine = candidate;
+        }
+    }
+    if (!currentLine.isEmpty()) lines.push_back(currentLine);
+    return lines;
+}
+
+// Mở rộng: word-wrap 1 câu UTF-8 đơn giản (tách theo khoảng trắng) thành nhiều dòng
+// sao cho mỗi dòng không vượt quá maxWidth pixel, dùng để hiển thị câu roast bên
+// trong bong bóng thoại của "robot mỏ hỗn".
+
+    // Word-wrap cho chuỗi UTF-8 (tiếng Việt có dấu) — đảm bảo không cắt byte UTF-8
+// và đo đúng chiều rộng theo style Bold để tránh tràn khung.
+// Word-wrap cho chuỗi UTF‑8 (tiếng Việt có dấu) — tương thích SFML 3
+static std::vector<sf::String> wrapUtf8Text(const sf::Font& font,
+    const std::string& utf8Text,
+    unsigned int charSize,
+    float maxWidth)
+{
+    // Chuyển toàn bộ sang UTF‑32 để tránh cắt byte UTF‑8
+    sf::String full = sf::String::fromUtf8(utf8Text.begin(), utf8Text.end());
+
+    std::vector<sf::String> words;
+    sf::String word;
+    for (std::size_t i = 0; i < full.getSize(); i++) {
+        if (full[i] == U' ') {
+            if (!word.isEmpty()) { words.push_back(word); word.clear(); }
+        }
+        else {
+            word += full[i];
+        }
+    }
+    if (!word.isEmpty()) words.push_back(word);
+
+    std::vector<sf::String> lines;
+    sf::String currentLine;
+    sf::Text measurer(font, "", charSize);
+    measurer.setStyle(sf::Text::Bold);
+
+    // đo đúng style Bold như khi vẽ thật
+
+    for (auto& w : words) {
+        sf::String candidate = currentLine.isEmpty() ? w : (currentLine + U' ' + w);
+        measurer.setString(candidate);
+
+        // SFML 3: getLocalBounds() trả về sf::FloatRect với hàm .size.x thay cho .width
+        float width = measurer.getLocalBounds().size.x;
+
+        if (width > maxWidth && !currentLine.isEmpty()) {
+            lines.push_back(currentLine);
+            currentLine = w;
+        }
+        else {
+            currentLine = candidate;
+        }
+    }
+    if (!currentLine.isEmpty()) lines.push_back(currentLine);
+    return lines;
+}
+
+// Mở rộng: SỬA LỖI "hướng dẫn chơi bị lệch/tràn khung" — trước đây nội dung
+// HOW TO PLAY (đặc biệt bản tiếng Việt) được viết sẵn với dấu xuống dòng "\n"
+// đặt thủ công theo cảm tính, không tính đúng bề rộng pixel thật của font.
+// Vì tiếng Việt có dấu thường rộng hơn tiếng Anh, nhiều dòng bị vượt quá bề
+// rộng khung (đặc biệt 2 khung TIME ATTACK / SURVIVAL bên phải), khiến chữ
+// tràn ra ngoài viền khung. Hàm này giữ nguyên các dấu xuống dòng CHỦ ĐỘNG có
+// sẵn (ranh giới giữa các gạch đầu dòng) nhưng tự động bẻ thêm dòng cho bất kỳ
+// đoạn nào bị dài hơn maxWidth, đo đúng theo pixel thật của font đang dùng,
+// nên chữ luôn nằm gọn trong khung dù nội dung/ngôn ngữ dài ngắn khác nhau.
+static sf::String wrapHowtoBody(const sf::Font& font, const sf::String& body,
+                                 unsigned int charSize, float maxWidth) {
+    std::vector<sf::String> paragraphs;
+    sf::String cur;
+    for (std::size_t i = 0; i < body.getSize(); i++) {
+        char32_t ch = body[i];
+        if (ch == static_cast<std::uint32_t>('\n')) {
+            paragraphs.push_back(cur);
+            cur.clear();
+        } else {
+            cur += ch;
+        }
+    }
+    paragraphs.push_back(cur);
+
+    sf::String result;
+    bool first = true;
+    for (auto& p : paragraphs) {
+        // Đoạn rỗng (dòng trống chủ động) vẫn giữ nguyên làm 1 dòng trống.
+        std::vector<sf::String> wrapped = p.isEmpty()
+            ? std::vector<sf::String>{ sf::String() }
+            : wrapWordsToWidth(font, p, charSize, maxWidth, /*bold=*/false);
+        for (auto& ln : wrapped) {
+            if (!first) result += sf::String("\n");
+            result += ln;
+            first = false;
+        }
+    }
+    return result;
+}
+
+// ---------- Fix lỗi Fullscreen/Resize ----------
+// Trước đây window được tạo với size cố định 1040x760, toàn bộ code vẽ/UI dùng
+// thẳng WINDOW_W/WINDOW_H, và tọa độ chuột lấy trực tiếp từ event->position
+// (pixel thật) rồi coi luôn là tọa độ "logic". Khi người dùng phóng to / bật
+// fullscreen (Windows maximize hoặc double-click titlebar), SFML KHÔNG tự cập
+// nhật lại view theo kích thước cửa sổ mới nếu không lắng nghe sự kiện Resized
+// -> nội dung bị vẽ kéo dãn (viewport mặc định vẫn là 0..1 nhưng size cửa sổ đã
+// đổi), đồng thời tọa độ chuột (pixel thật, không còn khớp khung 1040x760 logic)
+// lệch khỏi vị trí nút/khối hiển thị -> click/kéo/thả trật chỗ. Đây là gốc rễ
+// của cả 2 triệu chứng người dùng mô tả.
+//
+// Cách fix: giữ 1 view logic cố định WINDOW_W x WINDOW_H, dùng letterbox (viền
+// đen 2 bên) để giữ tỉ lệ khi cửa sổ đổi size, và luôn quy đổi tọa độ chuột qua
+// mapPixelToCoords(..., view hiện tại) thay vì dùng thẳng event->position.
+
+// Cập nhật viewport của view theo kích thước cửa sổ mới, giữ nguyên tỉ lệ khung
+// hình gốc (kỹ thuật "letterboxing" tiêu chuẩn của SFML).
+void updateLetterboxView(sf::View& view, unsigned int windowW, unsigned int windowH) {
+    float windowRatio = static_cast<float>(windowW) / static_cast<float>(windowH);
+    float viewRatio = view.getSize().x / view.getSize().y;
+    float sizeX = 1.f, sizeY = 1.f, posX = 0.f, posY = 0.f;
+    bool horizontalSpacing = true;
+    if (windowRatio < viewRatio) horizontalSpacing = false;
+
+    if (horizontalSpacing) {
+        sizeX = viewRatio / windowRatio;
+        posX = (1.f - sizeX) / 2.f;
+    } else {
+        sizeY = windowRatio / viewRatio;
+        posY = (1.f - sizeY) / 2.f;
+    }
+    view.setViewport(sf::FloatRect({posX, posY}, {sizeX, sizeY}));
+}
+
+// Quy đổi tọa độ pixel thật (event->position) sang tọa độ logic 1040x760 dùng
+// xuyên suốt code vẽ UI/grid. Dùng hàm này ở MỌI nơi xử lý chuột thay vì đọc
+// thẳng mp->position / mm->position, nếu không click sẽ lệch khi cửa sổ resize
+// hoặc fullscreen.
+sf::Vector2f toGameCoords(const sf::RenderWindow& window, sf::Vector2i pixel) {
+    return window.mapPixelToCoords(pixel, window.getView());
+}
+
+int main() {
+    srand(static_cast<unsigned int>(time(0))); // Việc 2 - Module 4: seed random
+    randomizePalette(); // sinh ngẫu nhiên bảng màu 6 khối cho lần chơi này
+
+    sf::RenderWindow window(sf::VideoMode({WINDOW_W, WINDOW_H}), "Block Blast - UTC2 Core-5");
+    window.setFramerateLimit(60);
+
+    // Icon ứng dụng (taskbar + thanh tiêu đề cửa sổ). File .exe trên Windows dùng
+    // icon riêng ở assets/icon.ico được nhúng qua app.rc (xem CMakeLists.txt).
+    sf::Image appIcon;
+
+if (appIcon.loadFromFile("assets/icon.png")) {
+        window.setIcon(appIcon);
+    } else {
+        std::cerr << "Khong tim thay icon assets/icon.png\n";
+    }
+
+    // View logic cố định WINDOW_W x WINDOW_H; mọi tọa độ vẽ (kể cả chuột sau khi
+    // quy đổi qua toGameCoords) đều nằm trong hệ tọa độ này bất kể cửa sổ to nhỏ.
+    sf::View gameView(sf::FloatRect({0.f, 0.f}, {static_cast<float>(WINDOW_W), static_cast<float>(WINDOW_H)}));
+    window.setView(gameView);
+
+    sf::Font font;
+    if (!font.openFromFile("assets/font.ttf")) {
+        std::cerr << "Khong tim thay font assets/font.ttf\n";
+        return 1;
+    }
+
+    // ---------- Mở rộng: "Robot mỏ hỗn" - chửi người chơi theo thời gian thực ----------
+    sf::Texture robotTexture;
+    bool robotTextureLoaded = robotTexture.loadFromFile("assets/robot.png");
+    RoastManager roastManager;
+    roastManager.setLanguage(false); // Mặc định khởi tạo theo Language::ENGLISH
+    // Đo "thời gian suy nghĩ" giữa 2 lần đặt khối liên tiếp, để phát hiện tình huống
+    // nghĩ rất lâu (AFK/cân nhắc kỹ) nhưng vẫn ra 1 nước đi tệ.
+    sf::Clock thinkClock;
+    float pendingThinkTime = 0.f;
+
+    // ---------- Âm thanh (SFX tổng hợp bằng sóng sine + nhạc nền), mở rộng từ bản MoreShapes ----------
+    SoundManager soundManager;
+    bool musicMuted = false;
+    bool sfxMuted = false; // Mở rộng: bật/tắt riêng SFX (đặt/xóa khối...) qua bảng Settings
+    soundManager.startMusic(); // phát nhạc nền ngay từ màn hình đầu tiên, tự lặp xuyên suốt game
+
+    // Mở rộng: bảng Settings (biểu tượng bánh răng) - bật/tắt Sound & BGM bất cứ lúc nào
+    // ở màn hình Menu hoặc Play, hoạt động như 1 overlay đè lên trên màn hình hiện tại.
+    bool settingsOpen = false;
