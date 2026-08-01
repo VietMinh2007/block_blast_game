@@ -1060,3 +1060,40 @@ if (appIcon.loadFromFile("assets/icon.png")) {
     sf::FloatRect vietnameseRow(sf::Vector2f(optionsOrigin.x, optionsOrigin.y + optionRowSize.y), optionRowSize);
 
     sf::FloatRect langOkBtn(sf::Vector2f(WINDOW_W / 2.f - 80.f, optionsOrigin.y + 2 * optionRowSize.y + 40.f), sf::Vector2f(160.f, 50.f));
+
+    // ===================== Mở rộng: bảng SETTINGS (biểu tượng bánh răng) =====================
+    // Biểu tượng bánh răng ở góc trên-phải, hiện ở Menu và trong lúc chơi (khi chưa Game Over).
+    const sf::FloatRect gearBtn(sf::Vector2f(WINDOW_W - 64.f, 18.f), sf::Vector2f(44.f, 44.f));
+
+    // Bảng Settings (overlay đè lên trên màn hình hiện tại), gồm 2 công tắc Sound & BGM,
+    // và (mở rộng) 2 nút to "Trang chủ" / "Chơi lại" ngay trong bảng, giống thiết kế tham khảo.
+    const sf::Vector2f settingsPanelSize(420.f, 400.f);
+    const sf::Vector2f settingsPanelPos(WINDOW_W / 2.f - settingsPanelSize.x / 2.f, WINDOW_H / 2.f - settingsPanelSize.y / 2.f);
+    const sf::FloatRect settingsCloseBtn(sf::Vector2f(settingsPanelPos.x + settingsPanelSize.x - 46.f, settingsPanelPos.y + 10.f), sf::Vector2f(36.f, 36.f));
+    const sf::Vector2f switchSize(76.f, 36.f);
+    const sf::FloatRect soundSwitchBtn(sf::Vector2f(settingsPanelPos.x + 70.f, settingsPanelPos.y + 130.f), switchSize);
+    const sf::FloatRect musicSwitchBtn(sf::Vector2f(settingsPanelPos.x + settingsPanelSize.x - 70.f - switchSize.x, settingsPanelPos.y + 130.f), switchSize);
+
+    // Mở rộng: 2 nút to bên trong bảng Settings - "Trang chủ" (về Menu) và "Chơi lại"
+    // (reset ván hiện tại), dùng được ở mọi lúc mở Settings (Menu lẫn đang chơi).
+    const sf::Vector2f settingsBtnSize(settingsPanelSize.x - 80.f, 56.f);
+    const sf::FloatRect settingsHomeBtn(sf::Vector2f(settingsPanelPos.x + 40.f, settingsPanelPos.y + 220.f), settingsBtnSize);
+    const sf::FloatRect settingsReplayBtn(sf::Vector2f(settingsPanelPos.x + 40.f, settingsPanelPos.y + 220.f + settingsBtnSize.y + 16.f), settingsBtnSize);
+
+    // Mở rộng: 2 nút "Trang chủ" / "Chơi lại" hiển thị trên màn hình Game Over.
+    // Đẩy 2 nút lên trên một chút (380.f) để bù lại phần chữ hướng dẫn phím tắt vừa bị xóa.
+    const sf::Vector2f gameOverBtnSize(180.f, 56.f);
+    const sf::FloatRect homeBtn(sf::Vector2f(WINDOW_W / 2.f - gameOverBtnSize.x / 2.f, 380.f), gameOverBtnSize);
+    const sf::FloatRect replayBtn(sf::Vector2f(WINDOW_W / 2.f - gameOverBtnSize.x / 2.f, 380.f + gameOverBtnSize.y + 16.f), gameOverBtnSize);
+
+    while (window.isOpen()) {
+        float dt = frameClock.restart().asSeconds();
+        uiPulseTime += dt; // mở rộng: đồng hồ nhấp nháy cho hiệu ứng nổi bật điểm/combo
+        previewPulseTime += dt; // dùng để tạo hiệu ứng nhấp nháy cho preview "sắp bị xóa"
+        roastManager.update(dt); // mở rộng: cập nhật cooldown/thời gian hiển thị của "robot mỏ hỗn"
+
+        // Splash screen tự động kết thúc sau SPLASH_TOTAL_DURATION giây (nếu người chơi
+        // không bấm bỏ qua trước đó), rồi chuyển tiếp sang màn hình chọn ngôn ngữ.
+        if (screen == Screen::SPLASH && splashClock.getElapsedTime().asSeconds() >= SPLASH_TOTAL_DURATION) {
+            screen = Screen::LANGUAGE;
+        }
