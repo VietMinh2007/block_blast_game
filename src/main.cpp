@@ -473,3 +473,93 @@ static sf::String wrapHowtoBody(const sf::Font& font, const sf::String& body,
     }
     return result;
 }
+
+// ---------- Fix lỗi Fullscreen/Resize ----------
+// Trước đây window được tạo với size cố định 1040x760, toàn bộ code vẽ/UI dùng
+// thẳng WINDOW_W/WINDOW_H, và tọa độ chuột lấy trực tiếp từ event->position
+// (pixel thật) rồi coi luôn là tọa độ "logic". Khi người dùng phóng to / bật
+// fullscreen (Windows maximize hoặc double-click titlebar), SFML KHÔNG tự cập
+// nhật lại view theo kích thước cửa sổ mới nếu không lắng nghe sự kiện Resized
+// -> nội dung bị vẽ kéo dãn (viewport mặc định vẫn là 0..1 nhưng size cửa sổ đã
+// đổi), đồng thời tọa độ chuột (pixel thật, không còn khớp khung 1040x760 logic)
+// lệch khỏi vị trí nút/khối hiển thị -> click/kéo/thả trật chỗ. Đây là gốc rễ
+// của cả 2 triệu chứng người dùng mô tả.
+//
+// Cách fix: giữ 1 view logic cố định WINDOW_W x WINDOW_H, dùng letterbox (viền
+// đen 2 bên) để giữ tỉ lệ khi cửa sổ đổi size, và luôn quy đổi tọa độ chuột qua
+// mapPixelToCoords(..., view hiện tại) thay vì dùng thẳng event->position.
+
+// Cập nhật viewport của view theo kích thước cửa sổ mới, giữ nguyên tỉ lệ khung
+// hình gốc (kỹ thuật "letterboxing" tiêu chuẩn của SFML).
+void updateLetterboxView(sf::View& view, unsigned int windowW, unsigned int windowH) {
+    float windowRatio = static_cast<float>(windowW) / static_cast<float>(windowH);
+    float viewRatio = view.getSize().x / view.getSize().y;
+    float sizeX = 1.f, sizeY = 1.f, posX = 0.f, posY = 0.f;
+    bool horizontalSpacing = true;
+    if (windowRatio < viewRatio) horizontalSpacing = false;
+
+    if (horizontalSpacing) {
+        sizeX = viewRatio / windowRatio;
+        posX = (1.f - sizeX) / 2.f;
+    } else {
+        sizeY = windowRatio / viewRatio;
+        posY = (1.f - sizeY) / 2.f;
+    }
+    view.setViewport(sf::FloatRect({posX, posY}, {sizeX, sizeY}));
+}
+
+// Quy đổi tọa độ pixel thật (event->position) sang tọa độ logic 1040x760 dùng
+// xuyên suốt code vẽ UI/grid. Dùng hàm này ở MỌI nơi xử lý chuột thay vì đọc
+// thẳng mp->position / mm->position, nếu không click sẽ lệch khi cửa sổ resize
+// hoặc fullscreen.
+sf::Vector2f toGameCoords(const sf::RenderWindow& window, sf::Vector2i pixel) {
+    return window.mapPixelToCoords(pixel, window.getView());
+}
+
+int main() {
+    srand(static_cast<unsigned int>(time(0))); // Việc 2 - Module 4: seed random
+    randomizePalette(); // sinh ngẫu nhiên bảng màu 6 khối cho lần chơi này
+
+    sf::RenderWindow window(sf::VideoMode({WINDOW_W, WINDOW_H}), "Block Blast - UTC2 Core-5");
+    window.setFramerateLimit(60);
+
+    // Icon ứng dụng (taskbar + thanh tiêu đề cửa sổ). File .exe trên Windows dùng
+    // icon riêng ở assets/icon.ico được nhúng qua app.rc (xem CMakeLists.txt).
+    sf::Image appIcon;
+
+if (appIcon.loadFromFile("assets/icon.png")) {
+        window.setIcon(appIcon);
+    } else {
+        std::cerr << "Khong tim thay icon assets/icon.png\n";
+    }
+
+    // View logic cố định WINDOW_W x WINDOW_H; mọi tọa độ vẽ (kể cả chuột sau khi
+    // quy đổi qua toGameCoords) đều nằm trong hệ tọa độ này bất kể cửa sổ to nhỏ.
+    sf::View gameView(sf::FloatRect({0.f, 0.f}, {static_cast<float>(WINDOW_W), static_cast<float>(WINDOW_H)}));
+    window.setView(gameView);
+
+    sf::Font font;
+    if (!font.openFromFile("assets/font.ttf")) {
+        std::cerr << "Khong tim thay font assets/font.ttf\n";
+        return 1;
+    }
+
+    // ---------- Mở rộng: "Robot mỏ hỗn" - chửi người chơi theo thời gian thực ----------
+    sf::Texture robotTexture;
+    bool robotTextureLoaded = robotTexture.loadFromFile("assets/robot.png");
+    RoastManager roastManager;
+    roastManager.setLanguage(false); // Mặc định khởi tạo theo Language::ENGLISH
+    // Đo "thời gian suy nghĩ" giữa 2 lần đặt khối liên tiếp, để phát hiện tình huống
+    // nghĩ rất lâu (AFK/cân nhắc kỹ) nhưng vẫn ra 1 nước đi tệ.
+    sf::Clock thinkClock;
+    float pendingThinkTime = 0.f;
+
+    // ---------- Âm thanh (SFX tổng hợp bằng sóng sine + nhạc nền), mở rộng từ bản MoreShapes ----------
+    SoundManager soundManager;
+    bool musicMuted = false;
+    bool sfxMuted = false; // Mở rộng: bật/tắt riêng SFX (đặt/xóa khối...) qua bảng Settings
+    soundManager.startMusic(); // phát nhạc nền ngay từ màn hình đầu tiên, tự lặp xuyên suốt game
+
+    // Mở rộng: bảng Settings (biểu tượng bánh răng) - bật/tắt Sound & BGM bất cứ lúc nào
+    // ở màn hình Menu hoặc Play, hoạt động như 1 overlay đè lên trên màn hình hiện tại.
+    bool settingsOpen = false;
