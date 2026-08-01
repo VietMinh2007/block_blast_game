@@ -2778,3 +2778,108 @@ else if (screen == Screen::MENU) {
                 drawGameOverBtn(replayBtn, UI().btnReplay);
             }
 
+// ===================== Mở rộng: "ROBOT MỎ HỖN" - avatar + bong bóng thoại =====================
+            // Vẽ SAU CÙNG (kể cả sau overlay Game Over) để câu chửi luôn hiện rõ, không bị đè.
+            // Mở rộng: panel TRÁI ở Survival đã kín chỗ (ĐIỂM + ĐỘ KHÓ + ĐÁ + thanh
+            // PRESSURE), còn ở Classic panel trái cũng đã có thanh "thời gian đã chơi"
+            // ngay dưới tab Độ Khó -> robot ở panel trái sẽ bị ĐÈ LÊN thanh thời gian đó.
+            // Vì vậy robot + bong bóng thoại luôn được vẽ ở panel PHẢI (ngay dưới ĐIỂM
+            // CAO NHẤT + COMBO), vốn luôn còn trống ở CẢ 3 chế độ - giống Survival/Time
+            // Attack, không còn ngoại lệ cho Classic.
+            const bool robotOnRight = true;
+            const float columnX = robotOnRight ? RIGHT_PANEL_X : LEFT_PANEL_X;
+            const float columnW = robotOnRight ? RIGHT_PANEL_W : LEFT_PANEL_W;
+            float gapTop;
+            if (robotOnRight) {
+                gapTop = GRID_ORIGIN_Y + 120.f + 108.f + 10.f; // Dưới tab ĐIỂM CAO NHẤT + COMBO
+            } else {
+                gapTop = GRID_ORIGIN_Y + 120.f + 92.f + 10.f; // Dưới tab 2 (Độ Khó)
+            }
+            const float gapBottom = trayY - 8.f;
+
+            // ---- 1. VẼ AVATAR ROBOT (LUÔN LUÔN HIỂN THỊ) ----
+            const float robotDisplayH = 118.f;
+            float robotDisplayW = robotDisplayH;
+            if (robotTextureLoaded) {
+                sf::Vector2u texSize = robotTexture.getSize();
+                robotDisplayW = robotDisplayH * (static_cast<float>(texSize.x) / texSize.y);
+            }
+            sf::Vector2f robotPos(columnX + (columnW - robotDisplayW) / 2.f, gapTop);
+
+            if (robotTextureLoaded) {
+                sf::Sprite robotSprite(robotTexture);
+                float scale = robotDisplayH / static_cast<float>(robotTexture.getSize().y);
+                robotSprite.setScale(sf::Vector2f(scale, scale));
+                robotSprite.setPosition(robotPos);
+                window.draw(robotSprite);
+            }
+
+            // ---- 2. VẼ BONG BÓNG THOẠI (CHỈ HIỂN THỊ KHI CHỬI) ----
+            if (roastManager.isActive()) {
+                const float bubblePadding = 14.f;
+                const float bubbleTailH = 12.f;
+                const float bubbleY = robotPos.y + robotDisplayH + bubbleTailH;
+                // Mở rộng: bong bóng rộng hơn khung panel trái một chút (lấn sang phần
+                // khoảng trống giữa panel và lưới) để chữ không phải co quá nhỏ.
+                // SỬA LỖI "thanh chat lệch khỏi khung": trước đây bubbleX = columnX
+                // trong khi bubbleW rộng hơn columnW, nên phần dư 34px chỉ lấn về phía
+                // BÊN PHẢI -> bong bóng (và cả cái đuôi trỏ lên robot) bị lệch hẳn sang
+// phải so với avatar robot và so với các khung panel bên dưới nó. Giờ
+                // trừ đều phân nửa phần dư sang bên trái để bong bóng nằm ĐỐI XỨNG,
+                // đúng tâm với avatar robot (cũng đang canh giữa columnX..columnX+columnW).
+                const float bubbleW = columnW + 34.f;
+                const float bubbleX = columnX - (bubbleW - columnW) / 2.f;
+                const float maxBubbleH = gapBottom - bubbleY; // chỗ trống tối đa cho bong bóng
+
+                // Mở rộng: nếu câu roast dài mà khung không đủ chỗ hiển thị hết, TỰ ĐỘNG
+                // giảm dần cỡ chữ (thay vì cắt cụt câu như bản cũ) để luôn thấy trọn câu.
+                // Cỡ chữ khởi điểm tăng lên 17 (từ 14) và không nhỏ hơn 13 để dễ đọc hơn.
+                unsigned int roastCharSize = 17;
+                float lineH = 21.f;
+                std::vector<sf::String> roastLines;
+                float bubbleH = 0.f;
+                while (true) {
+                    // Trừ thêm 4px "an toàn" ngoài padding 2 bên, để bù sai số làm tròn
+                    // pixel + khoảng cách giữa các ký tự khi render Bold, tránh trường
+                    // hợp dòng chữ vừa đủ theo lý thuyết nhưng lúc vẽ ra lại nhích lố
+                    // 1-2px ra ngoài viền bong bóng.
+                    roastLines = wrapUtf8Text(font, roastManager.getCurrentLine(),
+                                               roastCharSize, bubbleW - bubblePadding * 2.f - 4.f);
+                    bubbleH = roastLines.size() * lineH + bubblePadding * 2.f;
+                    if (bubbleH <= maxBubbleH || roastCharSize <= 13) break;
+                    roastCharSize -= 1;
+                    lineH -= 1.f;
+                }
+                bubbleH = std::min(bubbleH, maxBubbleH); // an toàn: không tràn xuống khay khối
+                bubbleH = std::max(bubbleH, 46.f);
+
+                // Đuôi bong bóng trỏ LÊN phía robot
+                sf::ConvexShape tail;
+                tail.setPointCount(3);
+                tail.setPoint(0, sf::Vector2f(bubbleX + bubbleW / 2.f - 12.f, bubbleY));
+                tail.setPoint(1, sf::Vector2f(bubbleX + bubbleW / 2.f + 12.f, bubbleY));
+                tail.setPoint(2, sf::Vector2f(bubbleX + bubbleW / 2.f, bubbleY - bubbleTailH));
+                tail.setFillColor(sf::Color(28, 32, 66, 235));
+                window.draw(tail);
+
+                sf::RectangleShape bubbleBg(sf::Vector2f(bubbleW, bubbleH));
+                bubbleBg.setPosition(sf::Vector2f(bubbleX, bubbleY));
+                bubbleBg.setFillColor(sf::Color(28, 32, 66, 235));
+                bubbleBg.setOutlineColor(sf::Color(120, 170, 255));
+                bubbleBg.setOutlineThickness(2.5f);
+                window.draw(bubbleBg);
+// Canh giữa cả khối chữ theo chiều dọc trong bong bóng, và canh giữa
+                // theo chiều ngang từng dòng, để chữ đều 2 bên thay vì dồn về lề trái.
+                float textBlockH = roastLines.size() * lineH;
+                float ty = bubbleY + (bubbleH - textBlockH) / 2.f;
+                if (ty < bubbleY + bubblePadding * 0.5f) ty = bubbleY + bubblePadding * 0.5f;
+                for (auto& ln : roastLines) {
+                    sf::Text t(font, ln, roastCharSize);
+                    t.setStyle(sf::Text::Bold);
+                    t.setFillColor(sf::Color::White);
+                    t.setPosition(sf::Vector2f(centerTextX(t, bubbleX, bubbleW), ty));
+                    window.draw(t);
+                    ty += lineH;
+                }
+            }
+        }
