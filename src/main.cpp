@@ -892,3 +892,208 @@ if (appIcon.loadFromFile("assets/icon.png")) {
                 if (grid[r][c] == OBSTACLE_COLOR) n++;
         return n;
     };
+// ===================== NỘI DUNG MÀN HÌNH DISCLAIMER =====================
+    // Disclaimer đổi theo ngôn ngữ đã chọn ở màn hình trước:
+    //   - Tiếng Việt -> chữ có dấu (U8()).
+    //   - English    -> chữ tiếng Anh thường.
+    // Riêng 2 nút lựa chọn bên dưới LUÔN là tiếng Việt KHÔNG DẤU
+    // ("Toi dong tinh." / "Toi khong dong tinh.") theo đúng yêu cầu, bất kể
+    // ngôn ngữ đang chọn là gì.
+    const sf::Color DC_WHITE(230, 230, 230);
+    const sf::Color DC_HILITE(241, 196, 15); // vàng nhấn, cùng tông với "Diem cao nhat"
+
+    // Bản tiếng Việt (có dấu) - viết lại "chất" bài tập lớn môn CTDL & Giải thuật :)
+    auto buildDisclaimerParasVi = [&]() {
+        std::vector<Paragraph> paras;
+
+        Paragraph p0;
+        appendWords(p0, "Bằng việc chơi Block Blast phiên bản hắc hóa này, bạn sẽ trở thành", DC_WHITE);
+        appendWords(p0, "Đại sứ kiên nhẫn của làng xếp khối Việt Nam,", DC_HILITE);
+        appendWords(p0, "đại diện cho bài tập lớn môn Cấu trúc dữ liệu & Giải thuật, khoa CNTT, UTC2. Đây là một vinh dự lớn lao và cũng là một trọng trách nặng nề đối với quỹ thời gian ôn bài của bạn, nên bạn phải ghi nhớ những điều sau:", DC_WHITE);
+        paras.push_back(p0);
+
+        Paragraph p1;
+        appendWords(p1, "1. Game có chứa", DC_WHITE);
+        appendWords(p1, "một số nội dung gây nghiện cao,", DC_HILITE);
+        appendWords(p1, "có thể gây ám ảnh với các khối hình vuông rơi lơ lửng trong đầu mỗi khi bạn nhắm mắt ôn bài.", DC_WHITE);
+        paras.push_back(p1);
+
+        Paragraph p2;
+        appendWords(p2, "2. Lối chơi được", DC_WHITE);
+        appendWords(p2, "truyền cảm hứng", DC_HILITE);
+        appendWords(p2, "từ bài toán sắp xếp và tối ưu không gian lưu trữ thực tế, nhưng đã được kịch tính hóa hoàn toàn để thử thách giới hạn chịu đựng của não bộ.", DC_WHITE);
+        paras.push_back(p2);
+
+        Paragraph p3;
+        appendWords(p3, "3. Game", DC_WHITE);
+        appendWords(p3, "không nhằm đến, không cổ vũ, và không miệt thị", DC_HILITE);
+        appendWords(p3, "bất kỳ sinh viên, giảng viên hay tổ chức nào của môn Cấu trúc dữ liệu & Giải thuật tại UTC2. Bất kỳ sự tương đồng nào với deadline ngoài đời thực đều chỉ là ngẫu nhiên.", DC_WHITE);
+        paras.push_back(p3);
+
+        Paragraph p4;
+        appendWords(p4, "4. Mọi khối đặt xuống đều có ý nghĩa. Tôi không khuyến khích trải nghiệm game này vào ban đêm khi bạn còn dang dở commit trên GitHub hay chưa cài đặt xong giải thuật cho bài tập lớn. Tôi sẽ", DC_WHITE);
+        appendWords(p4, "không chịu trách nhiệm", DC_HILITE);
+        appendWords(p4, "cho bất kỳ vấn đề phát sinh nào về deadline của bạn sau khi chơi.", DC_WHITE);
+        paras.push_back(p4);
+
+        Paragraph p5;
+        appendWords(p5, "5. Sản phẩm này không phải là một công cụ minh họa giải thuật, và chắc chắn không có tác dụng thay thế cho việc ôn tập Sắp xếp, Tìm kiếm, Cây hay Đồ thị cho môn Cấu trúc dữ liệu & Giải thuật.", DC_WHITE);
+        paras.push_back(p5);
+
+        Paragraph p6;
+        appendWords(p6, "Chúc bạn có một trải nghiệm khó quên và không bị \"Stack Overflow\" quá sớm!", DC_WHITE);
+        paras.push_back(p6);
+
+        return paras;
+    };
+
+    // Bản tiếng Anh - dịch và giữ tinh thần hài hước tương tự
+    auto buildDisclaimerParasEn = [&]() {
+        std::vector<Paragraph> paras;
+
+        Paragraph p0;
+        appendWords(p0, "By playing this darker version of Block Blast, you will become", DC_WHITE);
+        appendWords(p0, "the Patient Ambassador of the Vietnamese block-stacking village,", DC_HILITE);
+        appendWords(p0, "representing the Data Structures & Algorithms coursework, CS Department, UTC2. This is both a great honor and a heavy responsibility for your remaining study time, so you must remember the following:", DC_WHITE);
+        paras.push_back(p0);
+
+        Paragraph p1;
+        appendWords(p1, "1. This game contains", DC_WHITE);
+        appendWords(p1, "some highly addictive content,", DC_HILITE);
+        appendWords(p1, "which may haunt you with floating square blocks every time you close your eyes to study.", DC_WHITE);
+        paras.push_back(p1);
+
+        Paragraph p2;
+        appendWords(p2, "2. The gameplay is", DC_WHITE);
+        appendWords(p2, "inspired", DC_HILITE);
+        appendWords(p2, "by real-world storage arrangement and optimization problems, but has been fully dramatized to test the limits of your brain's endurance.", DC_WHITE);
+        paras.push_back(p2);
+
+        Paragraph p3;
+        appendWords(p3, "3. This game", DC_WHITE);
+        appendWords(p3, "does not target, endorse, or mock", DC_HILITE);
+        appendWords(p3, "any student, lecturer, or organization of the Data Structures & Algorithms course at UTC2. Any resemblance to real-life deadlines is purely coincidental.", DC_WHITE);
+        paras.push_back(p3);
+
+        Paragraph p4;
+        appendWords(p4, "4. Every block placed down has meaning. I do not recommend playing this game at night while you still have unfinished commits on GitHub or an algorithm implementation left to do for your assignment. I will", DC_WHITE);
+        appendWords(p4, "not be held responsible", DC_HILITE);
+        appendWords(p4, "for any issues regarding your deadline after playing.", DC_WHITE);
+        paras.push_back(p4);
+
+        Paragraph p5;
+        appendWords(p5, "5. This product is not an algorithm visualization tool, and it definitely does not replace reviewing Sorting, Searching, Trees, or Graphs for your Data Structures & Algorithms course.", DC_WHITE);
+        paras.push_back(p5);
+
+        Paragraph p6;
+        appendWords(p6, "Have an unforgettable experience, and try not to hit \"Stack Overflow\" too soon!", DC_WHITE);
+        paras.push_back(p6);
+
+        return paras;
+    };
+
+    const float dcMarginX = 50.f;
+    const float dcMaxWidth = WINDOW_W - 2 * dcMarginX;
+    const unsigned int dcCharSize = 16; // giảm cỡ chữ để đoạn văn dài hơn vẫn vừa khung
+    std::vector<LaidOutWord> disclaimerLayout;
+
+    sf::Text disclaimerTitle(font, "DISCLAIMER", 34);
+    disclaimerTitle.setFillColor(sf::Color::White);
+
+    sf::Text agreeBtn(font, "[ I agree. ]", 20);
+    agreeBtn.setFillColor(sf::Color::White);
+    sf::Text disagreeBtn(font, "[ I disagree. ]", 20);
+    disagreeBtn.setFillColor(sf::Color::White);
+
+    // Dựng lại layout disclaimer theo ngôn ngữ hiện đang được chọn, đồng thời
+    // tự tính lại vị trí 2 nút Đồng ý / Không đồng ý dựa theo độ dài THỰC TẾ
+    // của đoạn văn, để dù bản dịch dài ngắn khác nhau cũng không bao giờ bị
+    // đè lên nhau. Được gọi lại mỗi khi người chơi bấm OK ở màn hình ngôn ngữ.
+    auto rebuildDisclaimerLayout = [&](Language lang) {
+        std::vector<Paragraph> disclaimerParas =
+            (lang == Language::VIETNAMESE) ? buildDisclaimerParasVi() : buildDisclaimerParasEn();
+        disclaimerLayout.clear();
+        float contentEndY = layoutParagraphs(font, disclaimerParas, dcMarginX, 100.f, dcMaxWidth,
+                                              dcCharSize, dcCharSize * 1.4f, 8.f, disclaimerLayout);
+
+        // Nút luôn cách đoạn văn ít nhất 25px, nhưng không thấp hơn 640 (giữ bố
+        // cục đẹp khi văn bản ngắn) và không vượt quá đáy cửa sổ.
+        float btnY = std::max(640.f, contentEndY + 25.f);
+        btnY = std::min(btnY, WINDOW_H - 55.f);
+        if (lang == Language::VIETNAMESE) {
+            agreeBtn.setString(U8("[ Toi dong tinh ]"));
+            disagreeBtn.setString(U8("[ Toi khong dong tinh ]"));
+            disclaimerTitle.setString(U8("LƯU Ý TRƯỚC KHI CHƠI"));
+        } else {
+            agreeBtn.setString("[ I agree. ]");
+            disagreeBtn.setString("[ I disagree. ]");
+            disclaimerTitle.setString("DISCLAIMER");
+        }
+
+        disclaimerTitle.setPosition(sf::Vector2f(WINDOW_W / 2.f - disclaimerTitle.getGlobalBounds().size.x / 2.f, 30.f));
+
+        // Nút bên trái (Đồng ý) sẽ đẩy lùi sang trái một đoạn bằng chính độ rộng của nó
+        // Nút bên phải (Không đồng ý) sẽ tiến sang phải
+        agreeBtn.setPosition(sf::Vector2f(WINDOW_W / 2.f - agreeBtn.getGlobalBounds().size.x - 30.f, btnY));
+        disagreeBtn.setPosition(sf::Vector2f(WINDOW_W / 2.f + 30.f, btnY));
+    };
+    // Chỉ dựng layout đoạn văn (nút và title sẽ được dựng bên trong hàm)
+    rebuildDisclaimerLayout(selectedLanguage);
+
+
+    // ===================== MÀN HÌNH CHỌN NGÔN NGỮ =====================
+    sf::Text langTitle(font, "Choose A Language", 30);
+    langTitle.setFillColor(sf::Color::White);
+    langTitle.setPosition(sf::Vector2f(WINDOW_W / 2.f - langTitle.getGlobalBounds().size.x / 2.f, 150.f));
+
+    sf::Text langSubtitle(font, "You can change anytime later", 16);
+    langSubtitle.setFillColor(sf::Color(160, 160, 160));
+    langSubtitle.setPosition(sf::Vector2f(WINDOW_W / 2.f - langSubtitle.getGlobalBounds().size.x / 2.f, 190.f));
+
+    const sf::Vector2f selectBoxPos(WINDOW_W / 2.f - 300.f, 250.f);
+    const sf::Vector2f selectBoxSize(600.f, 50.f);
+
+    const sf::Vector2f optionRowSize(600.f, 45.f);
+    const sf::Vector2f optionsOrigin(selectBoxPos.x, selectBoxPos.y + selectBoxSize.y + 10.f);
+
+    sf::FloatRect englishRow(optionsOrigin, optionRowSize);
+    sf::FloatRect vietnameseRow(sf::Vector2f(optionsOrigin.x, optionsOrigin.y + optionRowSize.y), optionRowSize);
+
+    sf::FloatRect langOkBtn(sf::Vector2f(WINDOW_W / 2.f - 80.f, optionsOrigin.y + 2 * optionRowSize.y + 40.f), sf::Vector2f(160.f, 50.f));
+
+    // ===================== Mở rộng: bảng SETTINGS (biểu tượng bánh răng) =====================
+    // Biểu tượng bánh răng ở góc trên-phải, hiện ở Menu và trong lúc chơi (khi chưa Game Over).
+    const sf::FloatRect gearBtn(sf::Vector2f(WINDOW_W - 64.f, 18.f), sf::Vector2f(44.f, 44.f));
+
+    // Bảng Settings (overlay đè lên trên màn hình hiện tại), gồm 2 công tắc Sound & BGM,
+    // và (mở rộng) 2 nút to "Trang chủ" / "Chơi lại" ngay trong bảng, giống thiết kế tham khảo.
+    const sf::Vector2f settingsPanelSize(420.f, 400.f);
+    const sf::Vector2f settingsPanelPos(WINDOW_W / 2.f - settingsPanelSize.x / 2.f, WINDOW_H / 2.f - settingsPanelSize.y / 2.f);
+    const sf::FloatRect settingsCloseBtn(sf::Vector2f(settingsPanelPos.x + settingsPanelSize.x - 46.f, settingsPanelPos.y + 10.f), sf::Vector2f(36.f, 36.f));
+    const sf::Vector2f switchSize(76.f, 36.f);
+    const sf::FloatRect soundSwitchBtn(sf::Vector2f(settingsPanelPos.x + 70.f, settingsPanelPos.y + 130.f), switchSize);
+    const sf::FloatRect musicSwitchBtn(sf::Vector2f(settingsPanelPos.x + settingsPanelSize.x - 70.f - switchSize.x, settingsPanelPos.y + 130.f), switchSize);
+
+    // Mở rộng: 2 nút to bên trong bảng Settings - "Trang chủ" (về Menu) và "Chơi lại"
+    // (reset ván hiện tại), dùng được ở mọi lúc mở Settings (Menu lẫn đang chơi).
+    const sf::Vector2f settingsBtnSize(settingsPanelSize.x - 80.f, 56.f);
+    const sf::FloatRect settingsHomeBtn(sf::Vector2f(settingsPanelPos.x + 40.f, settingsPanelPos.y + 220.f), settingsBtnSize);
+    const sf::FloatRect settingsReplayBtn(sf::Vector2f(settingsPanelPos.x + 40.f, settingsPanelPos.y + 220.f + settingsBtnSize.y + 16.f), settingsBtnSize);
+
+    // Mở rộng: 2 nút "Trang chủ" / "Chơi lại" hiển thị trên màn hình Game Over.
+    // Đẩy 2 nút lên trên một chút (380.f) để bù lại phần chữ hướng dẫn phím tắt vừa bị xóa.
+    const sf::Vector2f gameOverBtnSize(180.f, 56.f);
+    const sf::FloatRect homeBtn(sf::Vector2f(WINDOW_W / 2.f - gameOverBtnSize.x / 2.f, 380.f), gameOverBtnSize);
+    const sf::FloatRect replayBtn(sf::Vector2f(WINDOW_W / 2.f - gameOverBtnSize.x / 2.f, 380.f + gameOverBtnSize.y + 16.f), gameOverBtnSize);
+
+    while (window.isOpen()) {
+        float dt = frameClock.restart().asSeconds();
+        uiPulseTime += dt; // mở rộng: đồng hồ nhấp nháy cho hiệu ứng nổi bật điểm/combo
+        previewPulseTime += dt; // dùng để tạo hiệu ứng nhấp nháy cho preview "sắp bị xóa"
+        roastManager.update(dt); // mở rộng: cập nhật cooldown/thời gian hiển thị của "robot mỏ hỗn"
+
+        // Splash screen tự động kết thúc sau SPLASH_TOTAL_DURATION giây (nếu người chơi
+        // không bấm bỏ qua trước đó), rồi chuyển tiếp sang màn hình chọn ngôn ngữ.
+        if (screen == Screen::SPLASH && splashClock.getElapsedTime().asSeconds() >= SPLASH_TOTAL_DURATION) {
+            screen = Screen::LANGUAGE;
+        }
