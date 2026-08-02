@@ -41,3 +41,6 @@
 *  Bước 2: Giải nén file vừa tải - Bước này rất quan trọng
 *  Bước 3: Bấm vào file vừa giải nén tìm tệp .exe và chạy 
 *  Bước 4: Màn hình game hiển thị và Giải Trí timee!!
+## Lưu Ý
+*  Nếu phát hiện bug hoặc vấn đề khác hãy điền form ở phía dưới để chúng tôi cập nhật nhé!!
+  https://docs.google.com/forms/d/e/1FAIpQLSeRgyLJJ6J6A2E2K9pilcxApu9TDu4jOKdegoFWCvyCZT-xRA/viewform?usp=header
