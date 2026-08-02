@@ -24,4 +24,4 @@
 *  Bước 1: Tải  file zip đã nén được gửi trên github
 *  Bước 2: Giải nén file vừa tải
 *  Bước 3: Bấm vào file vừa giải nén tìm file .exe và chạy 
-*  Bước 4: Chơi game 
+*  Bước 4: Màn hình game hiển thị và Giải Trí timee!!
