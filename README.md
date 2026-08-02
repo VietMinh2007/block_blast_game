@@ -10,6 +10,8 @@
 
 **Mục tiêu:** Giúp người chơi rèn luyện tư duy logic, phản xạ nhanh nhạy, và... thử thách giới hạn chịu đựng của bản thân trước những lời "cà khịa" từ hệ thống AI của game.
 ##  Ảnh minh họa
+<img width="1031" height="751" alt="Ảnh chụp màn hình 2026-08-02 161031" src="https://github.com/user-attachments/assets/74a011fc-08c6-448e-90c6-1a64752b123d" />
+
 ## 👥 Thành viên và nhiệm vụ
 
 | STT | Họ và tên | Nhiệm vụ chính |
