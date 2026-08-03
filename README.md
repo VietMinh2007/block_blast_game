@@ -59,4 +59,4 @@ Mục tiêu: Giúp người chơi rèn luyện tư duy logic, phản xạ nhanh 
 - Bước 1: Tải file BlockBlast_Team10_UTC2.7z đã nén được gửi trên github
 - Bước 2: Giải nén file vừa tải - Bước này rất quan trọng
 - Bước 3: Bấm vào file vừa giải nén tìm tệp .exe và chạy
-- Bước 4: Màn hình game hiển thị và Giải Trí thôi!!
+- Bước 4: Màn hình game hiển thị và Giải Trí thôi!! 
